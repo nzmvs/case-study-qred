@@ -1,0 +1,131 @@
+openapi: 3.1.0
+info:
+  title: Billing API
+  version: 0.1.0
+  description: |
+    Owns Invoices: what a Company owes Qred. Depends on no other service at
+    runtime. A User may only see Invoices of Companies they are a member of,
+    as stated by the caller's principal (ADR 0003; mocked in this case).
+
+    All money is in minor units (öre) with an ISO 4217 currency. Errors use
+    `application/problem+json` (RFC 9457).
+servers:
+  - url: http://localhost:3003
+    description: Local (docker compose)
+security:
+  - bearerAuth: []
+
+paths:
+  /invoices:
+    get:
+      operationId: listInvoices
+      summary: A Company's Invoices, earliest due first
+      description: |
+        Empty when the caller is not a member of the Company. Paying an
+        Invoice is out of scope.
+      parameters:
+        - name: companyId
+          in: query
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated Invoice statuses to include; all when omitted.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/InvoiceStatus" }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Matching Invoices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Invoice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Caller principal; a demo principal name in this case (ADR 0003).
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          description: Minor units (öre for SEK).
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+
+    InvoiceStatus:
+      type: string
+      description: |
+        `overdue` is derived on read: an `open` Invoice past the end of its
+        `dueDate` in the Company's time zone.
+      enum: [open, overdue, paid]
+
+    Invoice:
+      type: object
+      required: [id, companyId, amount, dueDate, status, issuedAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        companyId:
+          $ref: "#/components/schemas/Id"
+          description: Reference to a Company in the Identity API.
+        amount: { $ref: "#/components/schemas/Money" }
+        dueDate:
+          type: string
+          format: date
+          description: Last day to pay, in the Company's time zone.
+        status: { $ref: "#/components/schemas/InvoiceStatus" }
+        issuedAt: { type: string, format: date-time }
+      example:
+        id: 00000000-0000-4000-a000-000000000301
+        companyId: 00000000-0000-4000-a000-000000000101
+        amount: { amount: 1249000, currency: SEK }
+        dueDate: "2026-10-15"
+        status: open
+        issuedAt: "2026-09-15T06:00:00+02:00"
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+  responses:
+    BadRequest:
+      description: The request is malformed.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or unknown principal.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
