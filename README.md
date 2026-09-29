@@ -76,4 +76,5 @@ The contract and smoke tests change data and reseed afterwards.
 ## Further reading
 
 - [CONTEXT.md](CONTEXT.md): the domain language used in code, contracts and docs
+- [NOTES.md](NOTES.md): known simplifications and what I would do with more time
 - [docs/adr](docs/adr): why the services are split, why PUT with If-Match, how auth is mocked, feature-flagged upstreams, UTC spend periods
