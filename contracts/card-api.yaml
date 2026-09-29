@@ -4,9 +4,9 @@ info:
   version: 0.1.0
   description: |
     Owns Cards and Transactions and their lifecycles. Depends on no other
-    service at runtime: access tokens are verified with the Identity API's
-    public key from configuration, and a User may only reach their own Cards
-    in Companies listed in the token's `memberships` claim.
+    service at runtime. A User may only reach their own Cards in Companies
+    they are a member of, as stated by the caller's principal (ADR 0003;
+    mocked in this case by demo principal names such as `anna`).
 
     All money is in minor units (öre) with an ISO 4217 currency. Errors use
     `application/problem+json` (RFC 9457). Resources that are not visible to
@@ -166,8 +166,8 @@ paths:
       summary: Record a Transaction authorised on a Card
       description: |
         Called by the card processor when a purchase is authorised. Requires
-        a client-credentials token from the Identity API with the
-        `transactions:write` scope; User tokens are rejected with `403`. The
+        a client principal with the `transactions:write` scope (the demo
+        principal `card-processor`); User principals are rejected with `403`. The
         Transaction starts `pending`. Rejected when the Card is not `active`
         or the amount exceeds the Card's Remaining spend in the Spend period
         that contains `occurredAt`.
@@ -201,8 +201,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
-      description: Access token issued by the Identity API.
+      description: Caller principal; a demo principal name in this case (ADR 0003).
 
   parameters:
     CardId:
@@ -441,12 +440,12 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Unauthorized:
-      description: Missing or invalid access token.
+      description: Missing or unknown principal.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Forbidden:
-      description: The token lacks the required scope.
+      description: The caller's principal lacks the required scope.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }

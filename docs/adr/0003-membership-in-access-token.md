@@ -6,3 +6,7 @@ The Identity API owns Memberships and issues signed JWTs whose claims list the C
 
 - Synchronous Membership lookup against the Identity API: always fresh, but couples every request's availability to the Identity API.
 - Local Membership replicas fed by Identity events: fresh and decoupled, but needs a message bus and consumers. The preferred next step beyond this case.
+
+## In this case
+
+Token issuance and verification are mocked: every service resolves the bearer token as a demo principal name (`anna`, `card-processor`) from shared configuration into the same `Principal` the JWT verification would produce. Membership and scope checks run against that `Principal` unchanged, so replacing the mock with JWT verification touches only each service's auth plugin.

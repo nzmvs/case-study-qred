@@ -1,0 +1,90 @@
+openapi: 3.1.0
+info:
+  title: Identity API
+  version: 0.1.0
+  description: |
+    Owns Users, Companies and Memberships (ADR 0003).
+
+    Authentication is mocked in this case: the bearer token is a demo
+    principal name (`anna`, `card-processor`) resolved from configuration
+    by every service. The target design, signed short-lived JWTs carrying
+    Membership claims, is described in ADR 0003.
+
+    Errors use `application/problem+json` (RFC 9457).
+servers:
+  - url: http://localhost:3001
+    description: Local (docker compose)
+
+paths:
+  /me:
+    get:
+      operationId: getMe
+      summary: The signed-in User and the Companies they are a member of
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The User
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Demo principal name; see the API description.
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+
+    Me:
+      type: object
+      required: [id, name, companies]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        companies:
+          type: array
+          description: Sorted by name.
+          items: { $ref: "#/components/schemas/Company" }
+      example:
+        id: 00000000-0000-4000-a000-000000000001
+        name: Anna Lindqvist
+        companies:
+          - id: 00000000-0000-4000-a000-000000000101
+            name: Company AB
+            timezone: Europe/Stockholm
+          - id: 00000000-0000-4000-a000-000000000102
+            name: Nordic Trading AB
+            timezone: Europe/Stockholm
+
+    Company:
+      type: object
+      required: [id, name, timezone]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        timezone:
+          type: string
+          description: IANA time zone; Spend periods are calendar months in it.
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Missing or unknown principal.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
