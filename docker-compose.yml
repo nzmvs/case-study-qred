@@ -1,6 +1,13 @@
 x-app: &app
   restart: unless-stopped
 
+x-mock: &mock
+  build: ./infra/prism
+  profiles: [mock]
+  restart: unless-stopped
+  volumes:
+    - ./contracts:/contracts:ro
+
 services:
   postgres:
     image: postgres:18-alpine
@@ -68,6 +75,26 @@ services:
         - { action: sync, path: ./apps/app-bff/src, target: /repo/apps/app-bff/src }
         - { action: rebuild, path: ./apps/app-bff/package.json }
     depends_on: [identity-api, card-api, billing-api]
+
+  mock-app-bff:
+    <<: *mock
+    command: ["/contracts/app-bff.yaml"]
+    ports: ["4000:4010"]
+
+  mock-identity-api:
+    <<: *mock
+    command: ["/contracts/identity-api.yaml"]
+    ports: ["4001:4010"]
+
+  mock-card-api:
+    <<: *mock
+    command: ["/contracts/card-api.yaml"]
+    ports: ["4002:4010"]
+
+  mock-billing-api:
+    <<: *mock
+    command: ["/contracts/billing-api.yaml"]
+    ports: ["4003:4010"]
 
 volumes:
   pgdata:

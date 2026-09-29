@@ -222,6 +222,7 @@ components:
     ETag:
       description: Version of the Card; send as `If-Match` to change it.
       schema: { type: string }
+      example: '"Yp3kR9x2Qa7LmW0e"'
 
   schemas:
     Id:
