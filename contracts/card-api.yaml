@@ -1,0 +1,491 @@
+openapi: 3.1.0
+info:
+  title: Card API
+  version: 0.1.0
+  description: |
+    Owns Cards and Transactions and their lifecycles. Depends on no other
+    service at runtime: access tokens are verified with the Identity API's
+    public key from configuration, and a User may only reach their own Cards
+    in Companies listed in the token's `memberships` claim.
+
+    All money is in minor units (öre) with an ISO 4217 currency. Errors use
+    `application/problem+json` (RFC 9457). Resources that are not visible to
+    the caller answer `404`, never `403`.
+servers:
+  - url: http://localhost:3002
+    description: Local (docker compose)
+security:
+  - bearerAuth: []
+
+paths:
+  /cards:
+    get:
+      operationId: listCards
+      summary: Find the caller's Cards in a Company
+      parameters:
+        - name: companyId
+          in: query
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+        - name: holder
+          in: query
+          required: true
+          description: Only the caller's own Cards can be listed.
+          schema: { type: string, enum: [me] }
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated Card statuses to include; all when omitted.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/CardStatus" }
+      responses:
+        "200":
+          description: Matching Cards
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Card" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /cards/{cardId}:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    get:
+      operationId: getCard
+      summary: A Card
+      responses:
+        "200":
+          description: The Card
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Card" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: putCard
+      summary: Replace a Card's mutable state
+      description: |
+        Carries the full mutable representation of the Card (ADR 0002). A
+        change of `status` must be one of the Card's `allowedTransitions`.
+        The `ETag` is a hash of the Card's representation. A PUT that changes
+        nothing writes nothing and returns the same `ETag`.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardInput" }
+            example:
+              settings: { spendingLimit: 2500000 }
+              state: { status: active, closedReason: null }
+      responses:
+        "200":
+          description: The updated Card
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Card" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IllegalTransition" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+
+  /cards/{cardId}/spend:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    get:
+      operationId: getCardSpend
+      summary: What a Card spent in a time range
+      description: |
+        Sum of pending and settled Transactions with `occurredAt` in
+        [`from`, `to`). Reversed Transactions do not count. Callers decide
+        the range; the Spend period is computed by the caller.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          description: Exclusive; must be after `from`.
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: The spend
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Spend" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /cards/{cardId}/transactions:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    get:
+      operationId: listCardTransactions
+      summary: A Card's Transactions, newest first
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque; `nextCursor` from the previous page.
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of Transactions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TransactionPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createCardTransaction
+      summary: Record a Transaction authorised on a Card
+      description: |
+        Called by the card processor when a purchase is authorised. Requires
+        a client-credentials token from the Identity API with the
+        `transactions:write` scope; User tokens are rejected with `403`. The
+        Transaction starts `pending`. Rejected when the Card is not `active`
+        or the amount exceeds the Card's Remaining spend in the Spend period
+        that contains `occurredAt`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransactionInput" }
+            example:
+              amount: { amount: 12900, currency: SEK }
+              merchantName: Pressbyrån
+              occurredAt: "2026-09-29T09:12:00+02:00"
+      responses:
+        "201":
+          description: The recorded Transaction
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transaction" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/CardNotActive" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token issued by the Identity API.
+
+  parameters:
+    CardId:
+      name: cardId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Id" }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: |
+        The Card's current `ETag`. The server answers `428` when it is
+        missing; the contract mock answers `400` instead.
+      schema: { type: string }
+
+  headers:
+    ETag:
+      description: Version of the Card; send as `If-Match` to change it.
+      schema: { type: string }
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          description: Minor units (öre for SEK).
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+
+    CardStatus:
+      type: string
+      enum: [inactive, active, frozen, closed, expired]
+
+    ClosedReason:
+      type: string
+      enum: [lost, stolen, cancelled]
+
+    CardTransition:
+      type: string
+      enum: [activate, freeze, unfreeze, close]
+
+    Card:
+      type: object
+      required: [id, createdAt, updatedAt, details, settings, state]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        createdAt: { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last change to settings or state; unchanged by a PUT that changes nothing.
+        details: { $ref: "#/components/schemas/CardDetails" }
+        settings: { $ref: "#/components/schemas/CardSettings" }
+        state: { $ref: "#/components/schemas/CardState" }
+      example:
+        id: 00000000-0000-4000-a000-000000000201
+        createdAt: "2026-01-12T10:00:00+01:00"
+        updatedAt: "2026-01-14T08:30:00+01:00"
+        details:
+          companyId: 00000000-0000-4000-a000-000000000101
+          holderUserId: 00000000-0000-4000-a000-000000000001
+          last4: "4821"
+          expiry: { month: 9, year: 2029 }
+          currency: SEK
+        settings:
+          spendingLimit: 1000000
+        state:
+          status: active
+          closedReason: null
+          allowedTransitions: [freeze, close]
+
+    CardDetails:
+      type: object
+      description: Fixed when the Card is issued; never changes.
+      required: [companyId, holderUserId, last4, expiry, currency]
+      properties:
+        companyId:
+          $ref: "#/components/schemas/Id"
+          description: Reference to a Company in the Identity API.
+        holderUserId:
+          $ref: "#/components/schemas/Id"
+          description: Reference to the Cardholder, a User in the Identity API.
+        last4:
+          type: string
+          pattern: "^[0-9]{4}$"
+          description: Last four digits of the card number.
+        expiry:
+          type: object
+          required: [month, year]
+          properties:
+            month: { type: integer, minimum: 1, maximum: 12 }
+            year: { type: integer, minimum: 2000 }
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: The only currency the Card spends and is limited in.
+
+    CardSettings:
+      type: object
+      description: Editable at any time; no lifecycle rules.
+      required: [spendingLimit]
+      additionalProperties: false
+      properties:
+        spendingLimit:
+          type: integer
+          minimum: 0
+          description: Maximum spend per Spend period, in minor units of `details.currency`.
+
+    CardState:
+      type: object
+      description: Changes only through the Card's state machine.
+      required: [status, closedReason, allowedTransitions]
+      properties:
+        status: { $ref: "#/components/schemas/CardStatus" }
+        closedReason:
+          oneOf:
+            - $ref: "#/components/schemas/ClosedReason"
+            - type: "null"
+        allowedTransitions:
+          type: array
+          description: Status changes allowed from the current status.
+          items: { $ref: "#/components/schemas/CardTransition" }
+
+    CardInput:
+      type: object
+      description: |
+        The mutable part of a Card: `settings` and `state` without the derived
+        `allowedTransitions`. `details` cannot be sent.
+      required: [settings, state]
+      additionalProperties: false
+      properties:
+        settings: { $ref: "#/components/schemas/CardSettings" }
+        state:
+          type: object
+          description: |
+            A changed `status` must be one of `allowedTransitions` (`409`
+            otherwise). `closedReason` is required exactly when `status` is
+            `closed` (`422` otherwise).
+          required: [status, closedReason]
+          additionalProperties: false
+          properties:
+            status: { $ref: "#/components/schemas/CardStatus" }
+            closedReason:
+              oneOf:
+                - $ref: "#/components/schemas/ClosedReason"
+                - type: "null"
+
+    Spend:
+      type: object
+      required: [from, to, spent]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        spent: { $ref: "#/components/schemas/Money" }
+      example:
+        from: "2026-09-01T00:00:00+02:00"
+        to: "2026-10-01T00:00:00+02:00"
+        spent: { amount: 460000, currency: SEK }
+
+    TransactionStatus:
+      type: string
+      enum: [pending, settled, reversed]
+
+    Transaction:
+      type: object
+      required: [id, cardId, amount, merchantName, occurredAt, status]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        cardId: { $ref: "#/components/schemas/Id" }
+        amount: { $ref: "#/components/schemas/Money" }
+        merchantName: { type: string }
+        occurredAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/TransactionStatus" }
+      example:
+        id: 00000000-0000-4000-a000-000000001057
+        cardId: 00000000-0000-4000-a000-000000000201
+        amount: { amount: 89500, currency: SEK }
+        merchantName: SJ AB
+        occurredAt: "2026-09-28T16:42:00+02:00"
+        status: pending
+
+    TransactionInput:
+      type: object
+      required: [amount, merchantName, occurredAt]
+      additionalProperties: false
+      properties:
+        amount:
+          allOf:
+            - $ref: "#/components/schemas/Money"
+          description: Positive; currency must equal the Card's `details.currency`.
+        merchantName: { type: string, minLength: 1, maxLength: 200 }
+        occurredAt: { type: string, format: date-time }
+
+    TransactionPage:
+      type: object
+      required: [items, totalCount, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Transaction" }
+        totalCount:
+          type: integer
+          minimum: 0
+          description: All Transactions on the Card.
+        nextCursor:
+          oneOf:
+            - type: string
+            - type: "null"
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        allowedTransitions:
+          type: array
+          description: Present on an illegal transition.
+          items: { $ref: "#/components/schemas/CardTransition" }
+
+  responses:
+    BadRequest:
+      description: The request is malformed.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or invalid access token.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: The token lacks the required scope.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: The Card does not exist or is not visible to the caller.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    IllegalTransition:
+      description: The status change is not allowed from the Card's current status.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://api.qred.example/problems/illegal-transition
+            title: Illegal card status transition
+            status: 409
+            detail: A closed card cannot be activated.
+            allowedTransitions: []
+    CardNotActive:
+      description: The Card is not active and cannot be charged.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PreconditionFailed:
+      description: The Card changed since its `ETag` was read.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PreconditionRequired:
+      description: "`If-Match` is missing."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unprocessable:
+      description: |
+        Well-formed but violates a domain rule: a missing or unexpected
+        `closedReason`, a non-positive amount, a currency mismatch, or the
+        Spending limit would be exceeded.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }

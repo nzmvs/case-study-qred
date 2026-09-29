@@ -47,24 +47,28 @@ _Avoid_: Page, view model, dashboard
 ### Cards
 
 **Card**:
-A payment card issued to one Cardholder under one Company. A Cardholder has at most one Card in a Company that is not closed.
+A payment card issued to one Cardholder under one Company. A Cardholder has at most one Card in a Company that is neither closed nor expired.
 _Avoid_: Account, credit card
 
 **Card status**:
-Where a Card is in its lifecycle: inactive (issued, not yet usable), active, frozen (temporarily blocked by the Cardholder), or closed (permanently unusable).
+Where a Card is in its lifecycle: inactive (issued, not yet usable), active, frozen (temporarily blocked by the Cardholder), closed (permanently ended by a decision), or expired (permanently ended by passing its expiry date).
 _Avoid_: State, card state, blocked, cancelled
 
 **Closed reason**:
-Why a Card was closed: lost, stolen, expired, or cancelled.
+Why a Card was closed: lost, stolen, or cancelled. Expiry is not a Closed reason; it is its own Card status.
 _Avoid_: Termination reason, block reason
 
 **Replacement**:
-A new Card issued to the same Cardholder in the same Company after their previous Card was closed.
+A new Card issued to the same Cardholder in the same Company after their previous Card was closed or expired.
 _Avoid_: Reissue, renewal
 
 **Transaction**:
 A single purchase or charge made with a Card. It is pending until the card network confirms it (settled) or cancels it (reversed).
 _Avoid_: Payment, purchase, charge, authorisation
+
+**Card processor**:
+The external party that authorises Card purchases and reports them as Transactions.
+_Avoid_: Acquirer, network, PSP
 
 ### Spend
 
@@ -77,7 +81,7 @@ The calendar month, in the Company's time zone, over which a Card's spend is mea
 _Avoid_: Cycle, window
 
 **Remaining spend**:
-The Spending limit minus the sum of pending and settled Transactions on a Card in the current Spend period.
+The Spending limit minus the sum of pending and settled Transactions on a Card in the current Spend period, never below zero.
 _Avoid_: Balance, available funds
 
 ### Billing
