@@ -1,3 +1,4 @@
+import { httpErrors } from "@fastify/sensible";
 import type { FastifyRequest } from "fastify";
 
 export type Principal =
@@ -12,10 +13,6 @@ declare module "fastify" {
   }
 }
 
-export class Unauthenticated extends Error {
-  readonly statusCode = 401;
-}
-
 /**
  * Mocked authentication (ADR 0003): the bearer token is a demo principal name. Replacing this
  * with JWT verification must produce the same Principal and touches nothing else.
@@ -24,7 +21,7 @@ export function bearerAuth(principals: Principals) {
   return async (request: FastifyRequest) => {
     const [scheme, token] = (request.headers.authorization ?? "").split(" ");
     const principal = scheme === "Bearer" && token ? principals[token] : undefined;
-    if (!principal) throw new Unauthenticated("Unknown principal.");
+    if (!principal) throw httpErrors.unauthorized("Missing or unknown principal.");
     request.principal = principal;
   };
 }

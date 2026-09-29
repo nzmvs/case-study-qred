@@ -7,7 +7,7 @@ import type { DB, Transactions } from "./db/types.js";
 import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
 import { spendPeriodOf } from "./domain/spend-period.js";
 import type { components, operations } from "./generated/card-api.js";
-import { badRequest, forbidden, type Principal, unprocessable } from "@qred/service-kit";
+import { httpErrors, type Principal } from "@qred/service-kit";
 import { cardNotActive, cardNotFound, staleCard } from "./problems.js";
 
 type Op = keyof operations;
@@ -47,7 +47,7 @@ function decodeCursor(cursor: string): [Date, string] {
     if (Number.isNaN(date.getTime()) || typeof id !== "string") throw new Error();
     return [date, id];
   } catch {
-    throw badRequest("The cursor is not valid.");
+    throw httpErrors.badRequest("The cursor is not valid.");
   }
 }
 
@@ -106,16 +106,15 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
 
         const now = clock();
         const current = toCard(row, now);
-        const ifMatch = request.headers["if-match"];
-        // RFC 9110: `*` matches any current representation.
-        if (ifMatch !== "*" && ifMatch !== etagOf(current)) throw staleCard();
+        // `*` is refused on purpose: it would skip the ETag check that stops lost updates (ADR 0002).
+        if (request.headers["if-match"] !== etagOf(current)) throw staleCard();
 
         const transition = resolveTransition(current.state.status, state.status);
         if (state.status === CardStatus.Closed) {
-          if (!state.closedReason) throw unprocessable("closedReason is required when closing a card.");
-          if (!transition && state.closedReason !== row.closedReason) throw unprocessable("A closed card's closedReason cannot change.");
+          if (!state.closedReason) throw httpErrors.unprocessableEntity("closedReason is required when closing a card.");
+          if (!transition && state.closedReason !== row.closedReason) throw httpErrors.unprocessableEntity("A closed card's closedReason cannot change.");
         } else if (state.closedReason !== null) {
-          throw unprocessable("closedReason must be null unless the card is closed.");
+          throw httpErrors.unprocessableEntity("closedReason must be null unless the card is closed.");
         }
 
         if (!transition && settings.spendingLimit === row.spendingLimit) {
@@ -144,7 +143,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
       const row = await findVisible(request.params.cardId, request.principal);
       const from = new Date(request.query.from);
       const to = new Date(request.query.to);
-      if (to < from) throw badRequest("`to` must not be before `from`.");
+      if (to < from) throw httpErrors.badRequest("`to` must not be before `from`.");
 
       const spent = await spentBetween(db, row.id, from, to);
       return { from: request.query.from, to: request.query.to, spent: { amount: spent, currency: row.currency } };
@@ -191,7 +190,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
     ) {
       const { principal } = request;
       if (principal.kind !== "client" || !principal.scopes.includes(TRANSACTIONS_WRITE)) {
-        throw forbidden(`Recording Transactions requires the ${TRANSACTIONS_WRITE} scope.`);
+        throw httpErrors.forbidden(`Recording Transactions requires the ${TRANSACTIONS_WRITE} scope.`);
       }
       const { amount, merchantName } = request.body;
       const occurredAt = new Date(request.body.occurredAt);
@@ -203,13 +202,13 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
 
         const status = effectiveStatus(row.status as CardStatus, row.expiresAt, clock());
         if (status !== CardStatus.Active) throw cardNotActive(status);
-        if (amount.amount <= 0) throw unprocessable("amount must be positive.");
-        if (amount.currency !== row.currency) throw unprocessable(`The Card spends in ${row.currency}, not ${amount.currency}.`);
+        if (amount.amount <= 0) throw httpErrors.unprocessableEntity("amount must be positive.");
+        if (amount.currency !== row.currency) throw httpErrors.unprocessableEntity(`The Card spends in ${row.currency}, not ${amount.currency}.`);
 
         const period = spendPeriodOf(occurredAt);
         const spent = await spentBetween(tx, row.id, period.start, period.end);
         if (spent + amount.amount > row.spendingLimit) {
-          throw unprocessable(`The purchase exceeds the Remaining spend of ${Math.max(0, row.spendingLimit - spent)} for this Spend period.`);
+          throw httpErrors.unprocessableEntity(`The purchase exceeds the Remaining spend of ${Math.max(0, row.spendingLimit - spent)} for this Spend period.`);
         }
 
         return tx

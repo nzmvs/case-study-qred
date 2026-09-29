@@ -282,8 +282,9 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description The Card's `etag` from the Screen. The server answers `428` when
-                 *     it is missing; the contract mock answers `400` instead.
+                 * @description The Card's `etag` from the Screen; `*` is refused (`412`). The
+                 *     server answers `428` when it is missing; the contract mock answers
+                 *     `400` instead.
                  * @example "c2a9f0"
                  */
                 "If-Match": string;

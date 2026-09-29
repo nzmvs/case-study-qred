@@ -1,4 +1,4 @@
-import { Problem } from "@qred/service-kit";
+import { type HttpError, httpErrors, type ProblemFields } from "@qred/service-kit";
 import createClient, { type Client } from "openapi-fetch";
 import type { paths as BillingPaths } from "./generated/billing-api.js";
 import type { paths as CardPaths } from "./generated/card-api.js";
@@ -26,7 +26,8 @@ export function createUpstreams(urls: UpstreamUrls): Upstreams {
 
 type FetchResult<T> = { data?: T; error?: unknown; response: Response };
 
-export const badGateway = (detail: string) => new Problem(502, "upstream-unavailable", "Bad gateway", detail);
+// A 5xx hides its message by default; which upstream failed is useful to the app and leaks nothing.
+export const badGateway = (detail: string) => httpErrors.createError(502, detail, { expose: true });
 
 /** A required upstream call: its data, or the Screen fails with 502. */
 export async function required<T>(name: string, request: Promise<FetchResult<T>>): Promise<{ data: T; response: Response }> {
@@ -51,8 +52,11 @@ export async function optional<T>(request: Promise<FetchResult<T>>): Promise<Sec
 }
 
 /** Re-raise an upstream RFC 9457 problem unchanged, e.g. the Card API's 409 with allowedTransitions. */
-export function forwardProblem(status: number, body: unknown): Problem {
+export function forwardProblem(status: number, body: unknown): HttpError {
   const { type, title, detail, status: _status, ...extensions } = (body ?? {}) as Record<string, unknown>;
-  const slug = typeof type === "string" ? type.split("/").pop()! : "upstream";
-  return new Problem(status, slug, typeof title === "string" ? title : "Upstream error", typeof detail === "string" ? detail : undefined, extensions);
+  return httpErrors.createError(status, typeof detail === "string" ? detail : "", {
+    ...extensions,
+    ...(typeof type === "string" ? { problemType: type.slice(type.lastIndexOf("/") + 1) } : {}),
+    ...(typeof title === "string" ? { title } : {}),
+  } satisfies ProblemFields);
 }

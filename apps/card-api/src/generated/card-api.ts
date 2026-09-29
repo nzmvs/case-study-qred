@@ -408,8 +408,10 @@ export interface components {
     parameters: {
         CardId: components["schemas"]["Id"];
         /**
-         * @description The Card's current `ETag`. The server answers `428` when it is
-         *     missing; the contract mock answers `422` instead.
+         * @description The Card's current `ETag`. `*` is refused like any other stale
+         *     value (`412`), since it would skip the check that prevents lost
+         *     updates. The server answers `428` when it is missing; the contract
+         *     mock answers `422` instead.
          */
         IfMatch: string;
     };
@@ -486,8 +488,10 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description The Card's current `ETag`. The server answers `428` when it is
-                 *     missing; the contract mock answers `422` instead.
+                 * @description The Card's current `ETag`. `*` is refused like any other stale
+                 *     value (`412`), since it would skip the check that prevents lost
+                 *     updates. The server answers `428` when it is missing; the contract
+                 *     mock answers `422` instead.
                  */
                 "If-Match": components["parameters"]["IfMatch"];
             };

@@ -3,7 +3,8 @@ import { Ajv, type Options as AjvOptions } from "ajv";
 import addFormats from "ajv-formats";
 import openapiGlue from "fastify-openapi-glue";
 import { bearerAuth, type Principals } from "./auth.js";
-import { badRequest, type ErrorMapper, Problem, problemHandler } from "./problems.js";
+import { httpErrors } from "@fastify/sensible";
+import { type ErrorMapper, problemHandler } from "./problems.js";
 
 type ServiceOptions = {
   /** The service's OpenAPI contract: routes, validation and serialisation all come from it. */
@@ -67,7 +68,7 @@ const METHODS: HTTPMethods[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTION
 function requireBody(route: RouteOptions) {
   if (!route.schema?.body) return;
   const check: preValidationHookHandler = async (request) => {
-    if (request.body === undefined) throw badRequest("A request body is required.");
+    if (request.body === undefined) throw httpErrors.badRequest("A request body is required.");
   };
   route.preValidation = [check, ...[route.preValidation ?? []].flat()];
 }
@@ -75,6 +76,9 @@ function requireBody(route: RouteOptions) {
 export async function buildService({ contractPath, serviceHandlers, principals, mapError, logger = false }: ServiceOptions) {
   const app = Fastify({ logger });
   app.setValidatorCompiler(contractValidators());
+  // The contracts accept JSON bodies only; Fastify's built-in text/plain parser would hand handlers a
+  // string that no body schema validates. Without it, other media types are 415.
+  app.removeContentTypeParser("text/plain");
 
   const declared = new Map<string, Set<string>>();
   app.setErrorHandler(problemHandler(mapError));
@@ -105,9 +109,8 @@ export async function buildService({ contractPath, serviceHandlers, principals, 
   for (const [url, methods] of [...declared]) {
     const missing = METHODS.filter((m) => !methods.has(m));
     const allow = [...methods].join(", ");
-    const reject = async (_request: unknown, reply: { header(name: string, value: string): unknown }) => {
-      reply.header("Allow", allow);
-      throw new Problem(405, "method-not-allowed", "Method not allowed", `Allowed: ${allow}.`);
+    const reject = async () => {
+      throw httpErrors.createError(405, `Allowed: ${allow}.`, { headers: { Allow: allow } });
     };
     // onRequest runs before body parsing, which would otherwise reject e.g. QUERY without a Content-Type first.
     app.route({ method: missing, url, onRequest: reject, handler: reject });

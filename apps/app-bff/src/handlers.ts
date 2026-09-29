@@ -1,4 +1,4 @@
-import { notFound, Unauthenticated } from "@qred/service-kit";
+import { httpErrors } from "@qred/service-kit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { operations } from "./generated/app-bff.js";
 import { assembleCardOverview, type CardOverviewScreen, currentSpendPeriod } from "./screen.js";
@@ -17,7 +17,7 @@ const DUE_INVOICE_STATUSES = ["open", "overdue"] as const;
 const FORWARDED_CARD_ERRORS = new Set([404, 409, 412]);
 
 function userIdOf(request: FastifyRequest): string {
-  if (request.principal.kind !== "user") throw new Unauthenticated("The App BFF serves Users only.");
+  if (request.principal.kind !== "user") throw httpErrors.unauthorized("The App BFF serves Users only.");
   return request.principal.userId;
 }
 
@@ -39,7 +39,7 @@ export function bffHandlers({ routing, clock, timeoutMs }: { routing: Routing; c
     const { data: me } = await required("Identity API", identity.GET("/me", call()));
     const selectedCompanyId = companyId ?? me.companies[0]?.id;
     if (!selectedCompanyId || !me.companies.some((c) => c.id === selectedCompanyId)) {
-      throw notFound("The Company does not exist or the User is not a member of it.");
+      throw httpErrors.notFound("The Company does not exist or the User is not a member of it.");
     }
 
     // Independent of the Card, so it runs while the Card is being found.

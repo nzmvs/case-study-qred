@@ -1,5 +1,5 @@
 import type { FastifyRequest } from "fastify";
-import { forbidden, Unauthenticated } from "@qred/service-kit";
+import { httpErrors } from "@qred/service-kit";
 import type { Database } from "./db/database.js";
 import type { components } from "./generated/identity-api.js";
 
@@ -9,10 +9,10 @@ export function identityHandlers({ db }: { db: Database }) {
   return {
     async getMe(request: FastifyRequest): Promise<Me> {
       const { principal } = request;
-      if (principal.kind !== "user") throw forbidden("Only a User has a /me.");
+      if (principal.kind !== "user") throw httpErrors.forbidden("Only a User has a /me.");
 
       const user = await db.selectFrom("users").select(["id", "name"]).where("id", "=", principal.userId).executeTakeFirst();
-      if (!user) throw new Unauthenticated("The principal's User does not exist.");
+      if (!user) throw httpErrors.unauthorized("The principal's User does not exist.");
 
       const companies = await db
         .selectFrom("memberships")

@@ -73,8 +73,9 @@ paths:
           in: header
           required: true
           description: |
-            The Card's `etag` from the Screen. The server answers `428` when
-            it is missing; the contract mock answers `400` instead.
+            The Card's `etag` from the Screen; `*` is refused (`412`). The
+            server answers `428` when it is missing; the contract mock answers
+            `400` instead.
           schema: { type: string }
           example: '"c2a9f0"'
       requestBody:
