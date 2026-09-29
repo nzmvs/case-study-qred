@@ -10,7 +10,6 @@ import { type ErrorMapper, problemHandler } from "./problems.js";
 type ServiceOptions = {
   /** The service's OpenAPI contract: routes, validation and serialisation all come from it. */
   contractPath: string;
-  /** One handler per `operationId` in the contract. */
   serviceHandlers: object;
   principals: Principals;
   mapError?: ErrorMapper;

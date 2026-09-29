@@ -1,3 +1,4 @@
+import type { Clock } from "@qred/service-kit";
 import type { FastifyRequest } from "fastify";
 import type { Expression, SqlBool } from "kysely";
 import type { Database } from "./db/database.js";
@@ -6,8 +7,6 @@ import type { components, operations } from "./generated/billing-api.js";
 
 type Query = NonNullable<operations["listInvoices"]["parameters"]["query"]>;
 type Invoice = components["schemas"]["Invoice"];
-
-export type Clock = () => Date;
 
 export function billingHandlers({ db, clock }: { db: Database; clock: Clock }) {
   return {

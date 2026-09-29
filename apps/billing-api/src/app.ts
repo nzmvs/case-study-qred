@@ -1,8 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildService, type Principals } from "@qred/service-kit";
+import { buildService, type Clock, type Principals } from "@qred/service-kit";
 import type { Database } from "./db/database.js";
-import { billingHandlers, type Clock } from "./handlers.js";
+import { billingHandlers } from "./handlers.js";
 
 const DEFAULT_CONTRACT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../contracts/billing-api.yaml");
 

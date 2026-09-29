@@ -8,7 +8,6 @@ type DbCliOptions<DB> = {
   reseed: (db: Kysely<DB>) => Promise<void>;
 };
 
-/** `migrate | seed | reset` against DATABASE_URL. */
 export async function runDbCli<DB>({ migrationFolder, seedIfEmpty, reseed }: DbCliOptions<DB>): Promise<void> {
   const commands = {
     migrate: (db: Kysely<DB>) => migrateToLatest(db, migrationFolder),

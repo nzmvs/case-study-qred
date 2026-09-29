@@ -6,8 +6,9 @@ import type { Database } from "./db/database.js";
 import type { DB, Transactions } from "./db/types.js";
 import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
 import { spendPeriodOf } from "./domain/spend-period.js";
+import { TransactionStatus } from "./domain/transaction-status.js";
 import type { components, operations } from "./generated/card-api.js";
-import { httpErrors, type Principal } from "@qred/service-kit";
+import { type Clock, httpErrors, type Principal } from "@qred/service-kit";
 import { cardNotActive, cardNotFound, staleCard } from "./problems.js";
 
 type Op = keyof operations;
@@ -18,9 +19,7 @@ type Body<K extends Op> = operations[K] extends { requestBody: { content: { "app
 type Transaction = components["schemas"]["Transaction"];
 
 const TRANSACTIONS_WRITE = "transactions:write";
-const COUNTED_STATUSES = ["pending", "settled"];
-
-export type Clock = () => Date;
+const COUNTED_STATUSES = [TransactionStatus.Pending, TransactionStatus.Settled];
 
 function visibleTo(row: CardRow, principal: Principal): boolean {
   return principal.kind === "user" && principal.memberships.includes(row.companyId) && row.holderUserId === principal.userId;
@@ -220,7 +219,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
             currency: amount.currency,
             merchantName,
             occurredAt,
-            status: "pending",
+            status: TransactionStatus.Pending,
           })
           .returningAll()
           .executeTakeFirstOrThrow();

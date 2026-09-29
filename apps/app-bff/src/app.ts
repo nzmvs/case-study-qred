@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildService, type Principals } from "@qred/service-kit";
-import { bffHandlers, type Clock } from "./handlers.js";
+import { buildService, type Clock, type Principals } from "@qred/service-kit";
+import { bffHandlers } from "./handlers.js";
 import type { Routing } from "./sources.js";
 
 const DEFAULT_CONTRACT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../contracts/app-bff.yaml");

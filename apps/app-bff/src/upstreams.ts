@@ -29,7 +29,6 @@ type FetchResult<T> = { data?: T; error?: unknown; response: Response };
 // A 5xx hides its message by default; which upstream failed is useful to the app and leaks nothing.
 export const badGateway = (detail: string) => httpErrors.createError(502, detail, { expose: true });
 
-/** A required upstream call: its data, or the Screen fails with 502. */
 export async function required<T>(name: string, request: Promise<FetchResult<T>>): Promise<{ data: T; response: Response }> {
   let result: FetchResult<T>;
   try {
@@ -41,7 +40,6 @@ export async function required<T>(name: string, request: Promise<FetchResult<T>>
   return { data: result.data, response: result.response };
 }
 
-/** An optional upstream call: its data, or a Section the Screen lists as unavailable. */
 export async function optional<T>(request: Promise<FetchResult<T>>): Promise<Section<T>> {
   try {
     const result = await request;

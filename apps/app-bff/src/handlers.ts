@@ -1,4 +1,4 @@
-import { httpErrors } from "@qred/service-kit";
+import { type Clock, httpErrors } from "@qred/service-kit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { operations } from "./generated/app-bff.js";
 import { assembleCardOverview, type CardOverviewScreen, currentSpendPeriod } from "./screen.js";
@@ -10,8 +10,6 @@ type PutCardPath = operations["putCard"]["parameters"]["path"];
 type PutCardHeaders = operations["putCard"]["parameters"]["header"];
 type PutCardBody = operations["putCard"]["requestBody"]["content"]["application/json"];
 
-export type Clock = () => Date;
-
 const OPEN_CARD_STATUSES = ["inactive", "active", "frozen"] as const;
 const DUE_INVOICE_STATUSES = ["open", "overdue"] as const;
 const FORWARDED_CARD_ERRORS = new Set([404, 409, 412]);
@@ -22,7 +20,6 @@ function userIdOf(request: FastifyRequest): string {
 }
 
 export function bffHandlers({ routing, clock, timeoutMs }: { routing: Routing; clock: Clock; timeoutMs: number }) {
-  /** Routes this request's upstreams and, where mocks are allowed, tells the client which served it. */
   function routeFor(request: FastifyRequest, reply: FastifyReply): Upstreams {
     const { upstreams, sources } = route(routing, userIdOf(request));
     if (routing.mock) reply.header("Qred-Data-Sources", describeSources(sources));

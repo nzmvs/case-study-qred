@@ -37,7 +37,9 @@ These are deliberate and visible in the running system.
 - **The Transactions Screen** behind "54 more items": `GET /screens/transactions?cardId&cursor`, contract first, on top of the Card API's existing cursor pagination.
 - **`GET /me/companies`** once a second Screen needs the Company switcher.
 - **Per-Company flag rollout.** The Card change would need the Company in its request (or a lookup first) so reads and writes always route to the same source.
-- **Resilience per upstream.** Timeouts tuned per upstream, a circuit breaker so a failing upstream is not called on every request, and `304` for unchanged Screens.
+- **Resilience per upstream.** Timeouts tuned per upstream, and a circuit breaker so a failing upstream is not called on every request.
+- **Conditional GET on Screens.** `@fastify/etag` in the App BFF would give each Screen an ETag and answer `304` when the app already has it, saving mobile bandwidth.
+- **Effect in the App BFF.** Composing upstreams with timeouts and partial failure is what Effect is built for; worth trying there if that logic grows.
 - **Card numbers.** Showing the full number or CVV belongs in the Card processor's secure view (PCI DSS), so it never passes through Qred's backend.
 - **Flag hygiene.** Each `bff-*-api-real` flag is removed from code once its service is live for everyone.
 
@@ -55,6 +57,8 @@ These are deliberate and visible in the running system.
 - **Edge concerns.** Rate limiting, request size limits and security headers at the gateway; CORS only where a browser client needs it.
 
 ## Tooling observations
+
+- The hand-written migrate, seed and reset CLI (`packages/service-kit/src/db-cli.ts`) could give way to `kysely-ctl`, Kysely's own CLI for migrations and seeds.
 
 - The official `stoplight/prism` image crashes on startup, so the mocks run the Prism npm package (`infra/prism`).
 - The Prism mocks answer a missing `If-Match` with a generic validation error (`400` for the App BFF, `422` for the Card API); the real services answer `428` as the contracts say.
