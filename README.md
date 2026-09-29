@@ -1,0 +1,75 @@
+# Qred Card
+
+Backend for the card overview screen of the Qred mobile app: the selected Company, the User's Card, Remaining spend against the Spending limit, the latest Transactions and the next Invoice due. Built contract-first: every API has an OpenAPI contract, a mock generated from it, and an implementation whose routes and validation come from that same contract.
+
+## Run it
+
+Requires Docker. Host-side scripts use Node 24 and pnpm 10.
+
+```sh
+pnpm start          # build and start the stack, wait until healthy
+pnpm dev            # same, in the foreground with hot reload
+pnpm down           # stop everything
+```
+
+Without pnpm on the host: `docker compose -f infra/docker-compose.yml up --build`.
+
+Then ask the App BFF for the screen (`anna` is a demo principal, see [ADR 0003](docs/adr/0003-membership-in-access-token.md)):
+
+```sh
+curl -H 'Authorization: Bearer anna' localhost:3000/screens/card-overview
+```
+
+A fresh stack serves every upstream from its contract mock. Open Unleash at [localhost:4242](http://localhost:4242) (`admin` / `unleash4all`) and turn on `bff-identity-api-real`, `bff-card-api-real` or `bff-billing-api-real` to switch that upstream to the real service. The response header `Qred-Data-Sources` shows which served it ([ADR 0004](docs/adr/0004-flagged-upstream-sources-in-bff.md)).
+
+## Services
+
+| Service | Port | Contract | What it owns |
+|---|---|---|---|
+| App BFF | 3000 | [app-bff.yaml](contracts/app-bff.yaml) | Screens for the mobile app, composed from the services below |
+| Identity API | 3001 | [identity-api.yaml](contracts/identity-api.yaml) | Users, Companies, Memberships |
+| Card API | 3002 | [card-api.yaml](contracts/card-api.yaml) | Cards, their lifecycle, Transactions, spend |
+| Billing API | 3003 | [billing-api.yaml](contracts/billing-api.yaml) | Invoices |
+| Contract mocks | 4001-4003 | same contracts | Prism mocks of Identity, Card and Billing |
+| App BFF mock | 4000 | app-bff.yaml | For frontend work before the BFF exists: `pnpm compose --profile mock up` |
+| Unleash | 4242 | | Feature flags for the BFF's upstream sources |
+| Postgres | internal | | One database per service |
+
+## Project structure
+
+```
+apps/
+  app-bff/          Screen assembly, upstream clients, mock/real routing
+  identity-api/     \
+  card-api/          > domain services: handlers, domain rules, migrations, seed
+  billing-api/      /
+packages/
+  service-kit/      shared plumbing: contract-driven Fastify, auth seam, problem+json, Kysely
+contracts/          OpenAPI contracts, the source of truth for routes, validation and types
+infra/              Dockerfile, docker-compose.yml, Postgres init, Prism image, Unleash seed
+tests/contract/     Schemathesis configuration per service
+scripts/            contract and smoke test runners
+docs/adr/           architecture decisions
+CONTEXT.md          domain glossary
+```
+
+## Scripts
+
+| Script | Does |
+|---|---|
+| `pnpm test` | unit tests in every package |
+| `pnpm typecheck` | TypeScript across the workspace |
+| `pnpm test:contract` | Schemathesis generates requests against each running service and checks every response against its contract |
+| `pnpm test:smoke` | Card API behaviour: ETags, the card lifecycle, the Spending limit |
+| `pnpm lint:contracts` | lints the OpenAPI contracts |
+| `pnpm gen` | regenerates TypeScript types from the contracts |
+| `pnpm db:reset` | reseeds the demo data |
+| `pnpm logs` | follows the stack's logs |
+| `pnpm compose ...` | any other `docker compose` command for this stack |
+
+The contract and smoke tests change data and reseed afterwards.
+
+## Further reading
+
+- [CONTEXT.md](CONTEXT.md): the domain language used in code, contracts and docs
+- [docs/adr](docs/adr): why the services are split, why PUT with If-Match, how auth is mocked, feature-flagged upstreams, UTC spend periods
