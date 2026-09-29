@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import canonicalize from "canonicalize";
 import type { Selectable } from "kysely";
 import type { Cards } from "../db/types.js";
 import { allowedTransitions, type CardStatus, effectiveStatus } from "../domain/card-lifecycle.js";
@@ -29,16 +30,7 @@ export function toCard(row: CardRow, now: Date): Card {
   };
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value !== null && typeof value === "object") {
-    const entries = Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 /** Strong ETag over the Card's representation, so it changes exactly when what a client sees changes. */
 export function etagOf(card: Card): string {
-  return `"${createHash("sha256").update(canonicalJson(card)).digest("base64url").slice(0, 16)}"`;
+  return `"${createHash("sha256").update(canonicalize(card)!).digest("base64url").slice(0, 16)}"`;
 }

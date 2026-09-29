@@ -5,6 +5,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import replyFrom from "@fastify/reply-from";
 import envSchema from "env-schema";
 import Fastify, { type FastifyReply } from "fastify";
 
@@ -80,19 +81,14 @@ app.get("/health", async () => ({ status: "ok" }));
 app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(await readFile(PAGE)));
 
 // The page talks to the real App BFF through here: same origin, and the BFF needs no CORS.
+await app.register(replyFrom, { base: config.APP_BFF_URL });
 app.route({
   method: ["GET", "PUT"],
   url: "/bff/*",
-  handler: async (request, reply) => {
-    const target = new URL(request.url.replace(/^\/bff/, ""), config.APP_BFF_URL);
-    const headers: Record<string, string> = { Authorization: `Bearer ${config.DEMO_USER_PRINCIPAL}` };
-    for (const name of ["content-type", "if-match"]) {
-      const value = request.headers[name];
-      if (typeof value === "string") headers[name] = value;
-    }
-    const body = request.method === "PUT" ? JSON.stringify(request.body) : undefined;
-    return relay(reply, await fetch(target, { method: request.method, headers, ...(body ? { body } : {}) }));
-  },
+  handler: (request, reply) =>
+    reply.from(request.url.replace(/^\/bff/, ""), {
+      rewriteRequestHeaders: (_request, headers) => ({ ...headers, authorization: `Bearer ${config.DEMO_USER_PRINCIPAL}` }),
+    }),
 });
 
 app.get("/flags", async () => {

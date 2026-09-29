@@ -7,6 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/reply-from": "^12.6.5",
     "env-schema": "^8.0.0",
     "fastify": "^5.12.5"
   }
