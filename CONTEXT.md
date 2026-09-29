@@ -77,7 +77,7 @@ The maximum a single Card may spend in one Spend period.
 _Avoid_: Card limit, budget, credit limit, set limit
 
 **Spend period**:
-The calendar month, in the Company's time zone, over which a Card's spend is measured against its Spending limit.
+The calendar month in UTC over which a Card's spend is measured against its Spending limit.
 _Avoid_: Cycle, window
 
 **Remaining spend**:

@@ -1,6 +1,6 @@
 import { sql } from "kysely";
 import type { Database } from "./database.js";
-import { zonedMonthStart } from "./zoned-time.js";
+import { spendPeriodOf } from "../domain/spend-period.js";
 
 // Fixed ids shared with the other services' seeds and the contract examples.
 const ANNA = "00000000-0000-4000-a000-000000000001";
@@ -9,7 +9,6 @@ const NORDIC_TRADING = "00000000-0000-4000-a000-000000000102";
 export const CARD_COMPANY_AB = "00000000-0000-4000-a000-000000000201";
 export const CARD_NORDIC_TRADING = "00000000-0000-4000-a000-000000000202";
 
-const TIME_ZONE = "Europe/Stockholm";
 const MERCHANTS = ["Espresso House", "Clas Ohlson", "SJ AB", "Circle K", "Webhallen", "Ahlsell", "Pressbyrån", "Staples"];
 
 const transactionId = (n: number) => `00000000-0000-4000-a000-${String(1000 + n).padStart(12, "0")}`;
@@ -22,8 +21,8 @@ type SeedTransaction = { amount: number; merchantName: string; occurredAt: Date;
  * 5 400 / 10 000 kr. Dates are relative to `now` so the demo shows current spend whenever it runs.
  */
 function companyAbTransactions(now: Date): SeedTransaction[] {
-  const thisMonth = zonedMonthStart(now, TIME_ZONE);
-  const lastMonth = zonedMonthStart(now, TIME_ZONE, -1);
+  const thisMonth = spendPeriodOf(now).start;
+  const lastMonth = spendPeriodOf(now, -1).start;
   const spread = (from: Date, to: Date, i: number, count: number) =>
     new Date(from.getTime() + ((to.getTime() - from.getTime()) * (i + 0.5)) / count);
 

@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { type Selectable, sql } from "kysely";
+import { type Selectable, sql, type Transaction as DbTransaction } from "kysely";
 import type { Principal } from "./auth.js";
 import { type CardRow, etagOf, toCard } from "./cards/representation.js";
 import type { Database } from "./db/database.js";
-import type { Transactions } from "./db/types.js";
+import type { DB, Transactions } from "./db/types.js";
 import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
+import { spendPeriodOf } from "./domain/spend-period.js";
 import type { components, operations } from "./generated/card-api.js";
 import { badRequest, cardNotActive, forbidden, notFound, preconditionFailed, unprocessable } from "./problems.js";
 
@@ -48,6 +49,18 @@ function decodeCursor(cursor: string): [Date, string] {
   } catch {
     throw badRequest("The cursor is not valid.");
   }
+}
+
+async function spentBetween(db: Database | DbTransaction<DB>, cardId: string, from: Date, to: Date): Promise<number> {
+  const { spent } = await db
+    .selectFrom("transactions")
+    .select(sql<number>`coalesce(sum(amount), 0)::int8`.as("spent"))
+    .where("cardId", "=", cardId)
+    .where("occurredAt", ">=", from)
+    .where("occurredAt", "<", to)
+    .where("status", "in", COUNTED_STATUSES)
+    .executeTakeFirstOrThrow();
+  return spent;
 }
 
 export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
@@ -131,14 +144,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
       const to = new Date(request.query.to);
       if (!(from < to)) throw badRequest("`to` must be after `from`.");
 
-      const { spent } = await db
-        .selectFrom("transactions")
-        .select(sql<number>`coalesce(sum(amount), 0)::int8`.as("spent"))
-        .where("cardId", "=", row.id)
-        .where("occurredAt", ">=", from)
-        .where("occurredAt", "<", to)
-        .where("status", "in", COUNTED_STATUSES)
-        .executeTakeFirstOrThrow();
+      const spent = await spentBetween(db, row.id, from, to);
       return { from: request.query.from, to: request.query.to, spent: { amount: spent, currency: row.currency } };
     },
 
@@ -185,29 +191,39 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
       if (principal.kind !== "client" || !principal.scopes.includes(TRANSACTIONS_WRITE)) {
         throw forbidden(`Recording Transactions requires the ${TRANSACTIONS_WRITE} scope.`);
       }
-      const row = await db.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).executeTakeFirst();
-      if (!row) throw notFound();
+      const { amount, merchantName } = request.body;
+      const occurredAt = new Date(request.body.occurredAt);
 
-      const status = effectiveStatus(row.status as CardStatus, row.expiresAt, clock());
-      if (status !== CardStatus.Active) throw cardNotActive(status);
+      // The Card row lock serialises purchases on one Card, so concurrent ones cannot jointly exceed the limit.
+      const created = await db.transaction().execute(async (tx) => {
+        const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
+        if (!row) throw notFound();
 
-      const { amount, merchantName, occurredAt } = request.body;
-      if (amount.amount <= 0) throw unprocessable("amount must be positive.");
-      if (amount.currency !== row.currency) throw unprocessable(`The Card spends in ${row.currency}, not ${amount.currency}.`);
+        const status = effectiveStatus(row.status as CardStatus, row.expiresAt, clock());
+        if (status !== CardStatus.Active) throw cardNotActive(status);
+        if (amount.amount <= 0) throw unprocessable("amount must be positive.");
+        if (amount.currency !== row.currency) throw unprocessable(`The Card spends in ${row.currency}, not ${amount.currency}.`);
 
-      const created = await db
-        .insertInto("transactions")
-        .values({
-          id: randomUUID(),
-          cardId: row.id,
-          amount: amount.amount,
-          currency: amount.currency,
-          merchantName,
-          occurredAt: new Date(occurredAt),
-          status: "pending",
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
+        const period = spendPeriodOf(occurredAt);
+        const spent = await spentBetween(tx, row.id, period.start, period.end);
+        if (spent + amount.amount > row.spendingLimit) {
+          throw unprocessable(`The purchase exceeds the Remaining spend of ${Math.max(0, row.spendingLimit - spent)} for this Spend period.`);
+        }
+
+        return tx
+          .insertInto("transactions")
+          .values({
+            id: randomUUID(),
+            cardId: row.id,
+            amount: amount.amount,
+            currency: amount.currency,
+            merchantName,
+            occurredAt,
+            status: "pending",
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+      });
       reply.code(201);
       return toTransaction(created);
     },

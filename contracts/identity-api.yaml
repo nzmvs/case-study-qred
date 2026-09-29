@@ -58,20 +58,15 @@ components:
         companies:
           - id: 00000000-0000-4000-a000-000000000101
             name: Company AB
-            timezone: Europe/Stockholm
           - id: 00000000-0000-4000-a000-000000000102
             name: Nordic Trading AB
-            timezone: Europe/Stockholm
 
     Company:
       type: object
-      required: [id, name, timezone]
+      required: [id, name]
       properties:
         id: { $ref: "#/components/schemas/Id" }
         name: { type: string }
-        timezone:
-          type: string
-          description: IANA time zone; Spend periods are calendar months in it.
 
     Problem:
       type: object

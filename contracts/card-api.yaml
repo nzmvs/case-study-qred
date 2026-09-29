@@ -115,7 +115,8 @@ paths:
       description: |
         Sum of pending and settled Transactions with `occurredAt` in
         [`from`, `to`). Reversed Transactions do not count. Callers decide
-        the range; the Spend period is computed by the caller.
+        the range; the current Spend period is the UTC calendar month
+        (ADR 0005).
       parameters:
         - name: from
           in: query
@@ -170,7 +171,7 @@ paths:
         principal `card-processor`); User principals are rejected with `403`. The
         Transaction starts `pending`. Rejected when the Card is not `active`
         or the amount exceeds the Card's Remaining spend in the Spend period
-        that contains `occurredAt`.
+        (the UTC calendar month, ADR 0005) that contains `occurredAt`.
       requestBody:
         required: true
         content:
