@@ -149,9 +149,9 @@ services:
       retries: 60
 
   unleash-seed:
-    image: curlimages/curl:8.17.0
-    entrypoint: ["/bin/sh", "/seed.sh"]
-    volumes: ["./infra/unleash/seed.sh:/seed.sh:ro"]
+    image: python:3.13-alpine
+    command: ["python", "/seed.py"]
+    volumes: ["./infra/unleash/seed.py:/seed.py:ro"]
     depends_on: { unleash: { condition: service_healthy } }
     restart: "no"
 
