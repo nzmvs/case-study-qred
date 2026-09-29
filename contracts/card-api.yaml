@@ -183,9 +183,6 @@ paths:
       responses:
         "201":
           description: The recorded Transaction
-          headers:
-            Location:
-              schema: { type: string }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Transaction" }

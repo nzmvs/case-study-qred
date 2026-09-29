@@ -23,7 +23,11 @@ RUN pnpm --filter @qred/${APP} build \
  && pnpm --filter @qred/${APP} deploy --prod --legacy /out
 
 FROM node:22-alpine AS prod
+ARG APP
 WORKDIR /app
 COPY --from=build /out .
+# Routes and validation are built from the contract at startup.
+COPY contracts/${APP}.yaml /app/contract.yaml
+ENV CONTRACT_PATH=/app/contract.yaml
 USER node
 CMD ["node", "dist/server.js"]

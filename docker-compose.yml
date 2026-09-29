@@ -1,3 +1,9 @@
+# Mocked authentication (ADR 0003): bearer token -> demo principal, shared by every service.
+x-principals: &principals >-
+  {"anna": {"kind": "user", "userId": "00000000-0000-4000-a000-000000000001",
+            "memberships": ["00000000-0000-4000-a000-000000000101", "00000000-0000-4000-a000-000000000102"]},
+   "card-processor": {"kind": "client", "clientId": "card-processor", "scopes": ["transactions:write"]}}
+
 x-app: &app
   restart: unless-stopped
 
@@ -41,10 +47,13 @@ services:
     environment:
       PORT: 3002
       DATABASE_URL: postgres://card:card@postgres:5432/card
+      AUTH_PRINCIPALS: *principals
     ports: ["3002:3002"]
     develop:
       watch:
         - { action: sync, path: ./apps/card-api/src, target: /repo/apps/card-api/src }
+        - { action: sync, path: ./apps/card-api/test, target: /repo/apps/card-api/test }
+        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/card-api/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
