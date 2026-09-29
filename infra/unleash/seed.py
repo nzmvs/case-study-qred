@@ -15,10 +15,11 @@ UNLEASH_URL = os.environ.get("UNLEASH_URL", "http://unleash:4242")
 FEATURES = f"{UNLEASH_URL}/api/admin/projects/default/features"
 ENVIRONMENT = "development"
 
-# Identity and Billing are delivered; the Card API is still served by its contract mock.
+# Day one: nothing is delivered yet, so every upstream starts on its contract mock. Each flag is
+# turned on in the Unleash UI as its service ships.
 FLAGS = {
-    "bff-identity-api-real": True,
-    "bff-billing-api-real": True,
+    "bff-identity-api-real": False,
+    "bff-billing-api-real": False,
     "bff-card-api-real": False,
 }
 
