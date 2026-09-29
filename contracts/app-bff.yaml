@@ -1,0 +1,406 @@
+openapi: 3.1.0
+info:
+  title: App BFF
+  version: 0.1.0
+  description: |
+    Screen-shaped API for the Qred mobile app. Each Screen is served as one
+    payload so a view renders from a single round trip. All money is in minor
+    units (öre) with an ISO 4217 currency.
+
+    Errors use `application/problem+json` (RFC 9457).
+servers:
+  - url: http://localhost:3000
+    description: Local (docker compose)
+security:
+  - bearerAuth: []
+
+paths:
+  /screens/card-overview:
+    get:
+      operationId: getCardOverviewScreen
+      summary: The card overview Screen
+      description: |
+        Everything the card overview Screen renders: the Company switcher, the
+        User's Card in the selected Company, Remaining spend for the current
+        Spend period, the latest Transactions and the next Invoice due.
+
+        Without `companyId` the first Company (by name) is selected, so the
+        first launch needs one call.
+
+        If an optional section cannot be loaded (upstream error or a timeout
+        of about 1 second) it is `null` and listed in `unavailable`; the
+        Screen still renders. Clients must keep an unavailable section in its
+        loading state, never render it as empty. If the Company list or the
+        Card cannot be loaded the request fails with `502`.
+      parameters:
+        - name: companyId
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/Id" }
+      responses:
+        "200":
+          description: The Screen
+          headers:
+            Qred-Data-Sources:
+              $ref: "#/components/headers/QredDataSources"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardOverviewScreen" }
+              examples:
+                activeCard: { $ref: "#/components/examples/ActiveCardScreen" }
+                inactiveCard: { $ref: "#/components/examples/InactiveCardScreen" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /cards/{cardId}:
+    put:
+      operationId: putCard
+      summary: Replace the User-editable state of the User's Card
+      description: |
+        Full representation of what the User may change on their Card, which
+        today is only its status. Drives the "Activate card" button (and
+        freeze / unfreeze). Send the Card's `etag` from the Screen as
+        `If-Match`. Returns the refreshed card overview Screen, so the app
+        re-renders without a second call.
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+        - name: If-Match
+          in: header
+          required: true
+          description: |
+            The Card's `etag` from the Screen. The server answers `428` when
+            it is missing; the contract mock answers `400` instead.
+          schema: { type: string }
+          example: '"c2a9f0"'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardInput" }
+            example: { status: active }
+      responses:
+        "200":
+          description: Card updated; the refreshed Screen
+          headers:
+            Qred-Data-Sources:
+              $ref: "#/components/headers/QredDataSources"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardOverviewScreen" }
+              examples:
+                activated: { $ref: "#/components/examples/ActiveCardScreen" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token issued by the Identity API.
+
+  headers:
+    QredDataSources:
+      description: |
+        Non-production only. Which upstreams served this response, e.g.
+        `identity=real, card=mock, billing=real`.
+      schema: { type: string }
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          description: Minor units (öre for SEK).
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+      example: { amount: 540000, currency: SEK }
+
+    CardOverviewScreen:
+      type: object
+      required: [companySwitcher, card, spend, latestTransactions, invoiceDue, unavailable]
+      properties:
+        companySwitcher: { $ref: "#/components/schemas/CompanySwitcher" }
+        card:
+          description: The User's Card in the selected Company; `null` when none is issued.
+          oneOf:
+            - $ref: "#/components/schemas/CardSummary"
+            - type: "null"
+        spend:
+          description: Remaining spend in the current Spend period; `null` when there is no Card or the section is unavailable.
+          oneOf:
+            - $ref: "#/components/schemas/Spend"
+            - type: "null"
+        latestTransactions:
+          description: "`null` when there is no Card or the section is unavailable."
+          oneOf:
+            - $ref: "#/components/schemas/LatestTransactions"
+            - type: "null"
+        invoiceDue:
+          description: The next open or overdue Invoice; `null` when none is due or the section is unavailable.
+          oneOf:
+            - $ref: "#/components/schemas/InvoiceDue"
+            - type: "null"
+        unavailable:
+          type: array
+          description: |
+            Sections that could not be loaded. Their value is `null` for that
+            reason alone; clients keep them in the loading state.
+          items:
+            type: string
+            enum: [spend, latestTransactions, invoiceDue]
+
+    CompanySwitcher:
+      type: object
+      required: [selectedCompanyId, companies]
+      properties:
+        selectedCompanyId: { $ref: "#/components/schemas/Id" }
+        companies:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { $ref: "#/components/schemas/Id" }
+              name: { type: string }
+
+    CardSummary:
+      type: object
+      required: [id, status, last4, expiry, holderName, etag, actions]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        status:
+          type: string
+          enum: [inactive, active, frozen]
+        last4:
+          type: string
+          pattern: "^[0-9]{4}$"
+        expiry:
+          type: string
+          pattern: "^[0-9]{2}/[0-9]{2}$"
+          description: MM/YY as printed on the Card.
+        holderName: { type: string }
+        etag:
+          type: string
+          description: Send as `If-Match` when changing this Card.
+        actions:
+          type: array
+          description: Status changes the User can make now; drives which buttons show.
+          items:
+            type: string
+            enum: [activate, freeze, unfreeze]
+
+    Spend:
+      type: object
+      required: [remaining, spendingLimit, spent, periodStart, periodEnd]
+      properties:
+        remaining: { $ref: "#/components/schemas/Money" }
+        spendingLimit: { $ref: "#/components/schemas/Money" }
+        spent: { $ref: "#/components/schemas/Money" }
+        periodStart: { type: string, format: date-time }
+        periodEnd:
+          type: string
+          format: date-time
+          description: Exclusive.
+
+    LatestTransactions:
+      type: object
+      required: [items, totalCount, moreCount]
+      properties:
+        items:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/TransactionRow" }
+        totalCount:
+          type: integer
+          minimum: 0
+          description: All Transactions on the Card.
+        moreCount:
+          type: integer
+          minimum: 0
+          description: Transactions not shown here ("54 more items").
+
+    TransactionRow:
+      type: object
+      required: [id, merchantName, amount, occurredAt, status]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        merchantName: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        occurredAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, settled, reversed]
+
+    InvoiceDue:
+      type: object
+      required: [id, amount, dueDate, status]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        amount: { $ref: "#/components/schemas/Money" }
+        dueDate: { type: string, format: date }
+        status:
+          type: string
+          enum: [open, overdue]
+
+    CardInput:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [active, frozen]
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        allowedTransitions:
+          type: array
+          description: Present on `409`.
+          items: { type: string }
+
+  responses:
+    BadRequest:
+      description: The request is malformed.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or invalid access token.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: The Company or Card does not exist or is not visible to the User.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: The status change is not allowed from the Card's current status.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://api.qred.example/problems/illegal-transition
+            title: Illegal card status transition
+            status: 409
+            detail: A closed card cannot be activated.
+            allowedTransitions: []
+    PreconditionFailed:
+      description: The Card changed since the `etag` was read; reload the Screen.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PreconditionRequired:
+      description: "`If-Match` is missing."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    BadGateway:
+      description: A required upstream failed.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  examples:
+    ActiveCardScreen:
+      summary: Company AB, active Card
+      value:
+        companySwitcher:
+          selectedCompanyId: 00000000-0000-4000-a000-000000000101
+          companies:
+            - { id: 00000000-0000-4000-a000-000000000101, name: Company AB }
+            - { id: 00000000-0000-4000-a000-000000000102, name: Nordic Trading AB }
+        card:
+          id: 00000000-0000-4000-a000-000000000201
+          status: active
+          last4: "4821"
+          expiry: 09/29
+          holderName: Anna Lindqvist
+          etag: '"c2a9f0"'
+          actions: [freeze]
+        spend:
+          remaining: { amount: 540000, currency: SEK }
+          spendingLimit: { amount: 1000000, currency: SEK }
+          spent: { amount: 460000, currency: SEK }
+          periodStart: "2026-09-01T00:00:00+02:00"
+          periodEnd: "2026-10-01T00:00:00+02:00"
+        latestTransactions:
+          items:
+            - id: 00000000-0000-4000-a000-000000001057
+              merchantName: SJ AB
+              amount: { amount: 89500, currency: SEK }
+              occurredAt: "2026-09-28T16:42:00+02:00"
+              status: pending
+            - id: 00000000-0000-4000-a000-000000001056
+              merchantName: Clas Ohlson
+              amount: { amount: 34900, currency: SEK }
+              occurredAt: "2026-09-27T11:05:00+02:00"
+              status: settled
+            - id: 00000000-0000-4000-a000-000000001055
+              merchantName: Espresso House
+              amount: { amount: 6400, currency: SEK }
+              occurredAt: "2026-09-27T08:17:00+02:00"
+              status: settled
+          totalCount: 57
+          moreCount: 54
+        invoiceDue:
+          id: 00000000-0000-4000-a000-000000000301
+          amount: { amount: 1249000, currency: SEK }
+          dueDate: "2026-10-15"
+          status: open
+        unavailable: []
+    InactiveCardScreen:
+      summary: Nordic Trading AB, Card not yet activated
+      value:
+        companySwitcher:
+          selectedCompanyId: 00000000-0000-4000-a000-000000000102
+          companies:
+            - { id: 00000000-0000-4000-a000-000000000101, name: Company AB }
+            - { id: 00000000-0000-4000-a000-000000000102, name: Nordic Trading AB }
+        card:
+          id: 00000000-0000-4000-a000-000000000202
+          status: inactive
+          last4: "7390"
+          expiry: 08/30
+          holderName: Anna Lindqvist
+          etag: '"91be07"'
+          actions: [activate]
+        spend:
+          remaining: { amount: 2500000, currency: SEK }
+          spendingLimit: { amount: 2500000, currency: SEK }
+          spent: { amount: 0, currency: SEK }
+          periodStart: "2026-09-01T00:00:00+02:00"
+          periodEnd: "2026-10-01T00:00:00+02:00"
+        latestTransactions:
+          items: []
+          totalCount: 0
+          moreCount: 0
+        invoiceDue: null
+        unavailable: []
