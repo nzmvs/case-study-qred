@@ -1,5 +1,5 @@
-import { httpErrors } from "@fastify/sensible";
-import type { FastifyRequest } from "fastify";
+import fastifyBearerAuth from "@fastify/bearer-auth";
+import type { FastifyInstance } from "fastify";
 
 export type Principal =
   | { kind: "user"; userId: string; memberships: string[] }
@@ -17,13 +17,18 @@ declare module "fastify" {
  * Mocked authentication (ADR 0003): the bearer token is a demo principal name. Replacing this
  * with JWT verification must produce the same Principal and touches nothing else.
  */
-export function bearerAuth(principals: Principals) {
-  return async (request: FastifyRequest) => {
-    const [scheme, token] = (request.headers.authorization ?? "").split(" ");
-    const principal = scheme === "Bearer" && token ? principals[token] : undefined;
-    if (!principal) throw httpErrors.unauthorized("Missing or unknown principal.");
-    request.principal = principal;
-  };
+export async function registerBearerAuth(app: FastifyInstance, principals: Principals) {
+  await app.register(fastifyBearerAuth, {
+    keys: [],
+    // Verification is called from the service's own onRequest hook, which keeps /health open.
+    addHook: false,
+    verifyErrorLogLevel: "debug",
+    auth: (token, request) => {
+      const principal = principals[token];
+      if (principal) request.principal = principal;
+      return principal !== undefined;
+    },
+  });
 }
 
 export function parsePrincipals(json: string | undefined): Principals {

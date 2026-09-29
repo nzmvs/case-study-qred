@@ -3,7 +3,7 @@ import { Ajv, type Options as AjvOptions } from "ajv";
 import addFormats from "ajv-formats";
 import openapiGlue from "fastify-openapi-glue";
 import qs from "qs";
-import { bearerAuth, type Principals } from "./auth.js";
+import { type Principals, registerBearerAuth } from "./auth.js";
 import { httpErrors } from "@fastify/sensible";
 import { type ErrorMapper, problemHandler } from "./problems.js";
 
@@ -81,15 +81,17 @@ export async function buildService({ contractPath, serviceHandlers, principals, 
 
   // Every contract operation requires a principal. Authenticating before validation means an
   // unauthenticated caller gets 401 and learns nothing about what a valid request looks like.
-  const authenticate = bearerAuth(principals);
-  app.addHook("onRequest", async (request) => {
-    if (request.routeOptions.url !== "/health") await authenticate(request);
+  await registerBearerAuth(app, principals);
+  app.addHook("onRequest", (request, reply, done) => {
+    if (request.routeOptions.url === "/health") return done();
+    app.verifyBearerAuth!(request, reply, done);
   });
 
   await app.register(openapiGlue, {
     specification: contractPath,
     serviceHandlers,
-    securityHandlers: { bearerAuth: authenticate },
+    // The contracts' bearerAuth scheme is already enforced by the onRequest hook above.
+    securityHandlers: { bearerAuth: async () => {} },
   });
 
   // A known path with an undeclared method is 405 with Allow (RFC 9110), not 404.

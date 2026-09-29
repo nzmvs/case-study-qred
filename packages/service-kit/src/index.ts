@@ -1,4 +1,4 @@
-export { bearerAuth, type Principal, type Principals, parsePrincipals } from "./auth.js";
+export { type Principal, type Principals, parsePrincipals } from "./auth.js";
 export { createDatabase } from "./database.js";
 export { runDbCli } from "./db-cli.js";
 export { migrateToLatest } from "./migrate.js";
