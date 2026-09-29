@@ -67,10 +67,13 @@ services:
     environment:
       PORT: 3003
       DATABASE_URL: postgres://billing:billing@postgres:5432/billing
+      AUTH_PRINCIPALS: *principals
     ports: ["3003:3003"]
     develop:
       watch:
         - { action: sync, path: ./apps/billing-api/src, target: /repo/apps/billing-api/src }
+        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/billing-api/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
