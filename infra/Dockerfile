@@ -8,6 +8,7 @@ COPY apps/identity-api/package.json apps/identity-api/
 COPY apps/card-api/package.json apps/card-api/
 COPY apps/billing-api/package.json apps/billing-api/
 COPY apps/app-bff/package.json apps/app-bff/
+COPY apps/demo/package.json apps/demo/
 COPY packages/service-kit/package.json packages/service-kit/
 RUN pnpm install --frozen-lockfile
 

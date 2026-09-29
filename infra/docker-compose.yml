@@ -117,6 +117,24 @@ services:
       billing-api: { condition: service_healthy }
       unleash-seed: { condition: service_completed_successfully }
 
+  # Dev-only demo harness: the Screen, flag switches and simulated purchases at localhost:3100.
+  demo:
+    <<: *app
+    build: { context: .., dockerfile: infra/Dockerfile, target: dev, args: { APP: demo } }
+    environment:
+      PORT: 3100
+      APP_BFF_URL: http://app-bff:3000
+      CARD_API_URL: http://card-api:3002
+      UNLEASH_URL: http://unleash:4242
+    ports: ["3100:3100"]
+    develop:
+      watch:
+        - { action: sync, path: ../apps/demo/src, target: /repo/apps/demo/src }
+        - { action: sync, path: ../apps/demo/public, target: /repo/apps/demo/public }
+        - { action: rebuild, path: ../apps/demo/package.json }
+    depends_on:
+      app-bff: { condition: service_healthy }
+
   # For frontend work before the App BFF exists; the upstream mocks run by default for its flags.
   mock-app-bff:
     <<: *mock

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Overview Demo</title>
+<style>
+  :root {
+    --bg: #f3f4f1; --panel: #ffffff; --ink: #1c2022; --muted: #6b7275; --line: #e2e4e0;
+    --accent: #1c2022; --accent-ink: #ffffff; --good: #1f7a4d; --warn: #b3541e; --bad: #b42318;
+    --mock: #7a5af8; --real: #1f7a4d; --skeleton: #e8e9e6; --card: #20262a;
+    --radius: 14px; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111416; --panel: #1a1e21; --ink: #eceeed; --muted: #9aa1a4; --line: #2b3034;
+      --accent: #eceeed; --accent-ink: #111416; --skeleton: #262b2f; --card: #2c3439;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 24px 0; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 400px 1fr; gap: 24px; padding: 20px 24px 32px; align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  /* The phone: a render of the card overview Screen, nothing more. */
+  .phone { background: var(--panel); border: 1px solid var(--line); border-radius: 32px; padding: 20px 18px 24px; display: grid; gap: 14px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+  .topbar span:last-child { font-weight: 500; color: var(--muted); }
+  select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  .box { background: var(--bg); border-radius: var(--radius); padding: 14px; }
+  .invoice { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+  .invoice.overdue { color: var(--bad); font-weight: 600; }
+  .card { background: var(--card); color: #f2f4f3; border-radius: var(--radius); padding: 18px; aspect-ratio: 1.6; display: flex; flex-direction: column; justify-content: space-between; }
+  .card .row { display: flex; justify-content: space-between; align-items: center; }
+  .card .number { font-family: var(--mono); letter-spacing: 2px; font-size: 17px; }
+  .badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 3px 8px; border-radius: 99px; background: rgba(255,255,255,.14); }
+  .badge.inactive { background: #b3541e; } .badge.frozen { background: #3b6fd4; }
+  .label { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .spend-value { font-size: 22px; font-weight: 700; margin: 0; }
+  .meter { height: 6px; border-radius: 99px; background: var(--line); margin: 10px 0 6px; overflow: hidden; }
+  .meter div { height: 100%; background: var(--good); }
+  .hint { font-size: 12px; color: var(--muted); text-align: right; margin: 0; }
+  .tx { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .tx:last-of-type { border-bottom: 0; }
+  .tx small { display: block; color: var(--muted); font-size: 12px; }
+  .tx .pending { color: var(--warn); font-size: 11px; font-weight: 700; margin-left: 6px; }
+  .more { display: block; text-align: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; font-size: 14px; }
+  .actions { display: grid; gap: 8px; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 11px 14px; background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .skeleton { background: var(--skeleton); border-radius: var(--radius); min-height: 64px; position: relative; overflow: hidden; }
+  .skeleton::after { content: "loading"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 18px; }
+
+  /* The inspector: what the backend did. */
+  .inspector { display: grid; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .panel h2 { margin: 0 0 10px; font-size: 14px; }
+  .panel p.note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .flags { display: grid; gap: 8px; }
+  .flag { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+  .source { font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; }
+  .source.mock { background: var(--mock); } .source.real { background: var(--real); }
+  .switch { display: flex; gap: 6px; }
+  .switch button { padding: 6px 10px; font-size: 13px; }
+  .switch button[aria-pressed="false"] { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .purchase { display: flex; gap: 8px; flex-wrap: wrap; }
+  .purchase input { flex: 1; min-width: 120px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  pre { margin: 0; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; background: var(--bg); border-radius: 10px; padding: 12px; }
+  .problem { border-color: var(--bad); }
+  .status { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Card overview demo harness</h1>
+  <p>Dev-only tool. The phone renders exactly what the App BFF returns for the card overview Screen; the panels show what the backend did.</p>
+</header>
+
+<main>
+  <section class="phone" id="phone" aria-label="Card overview Screen">
+    <div class="skeleton" style="min-height:540px"></div>
+  </section>
+
+  <section class="inspector">
+    <div class="panel">
+      <h2>Upstream sources</h2>
+      <p class="note">Each App BFF upstream is served by its contract mock or the real service (ADR 0004). Changes apply for everyone within a few seconds.</p>
+      <div class="flags" id="flags"></div>
+      <p class="status" id="sources"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Simulate a purchase</h2>
+      <p class="note">Records a Transaction on the real Card API as the Card processor would, then reloads the Screen. Over the Remaining spend it is refused.</p>
+      <form class="purchase" id="purchase">
+        <input id="amount" type="number" min="1" step="1" value="250" aria-label="Amount in kronor">
+        <input id="merchant" type="text" value="Pressbyrån" aria-label="Merchant">
+        <button type="submit">Buy</button>
+      </form>
+    </div>
+
+    <div class="panel" id="problem-panel" hidden>
+      <h2>Last problem</h2>
+      <pre id="problem"></pre>
+    </div>
+
+    <div class="panel">
+      <h2>Screen payload <span class="status" id="timing"></span></h2>
+      <pre id="payload">loading</pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const UPSTREAMS = ["identity", "card", "billing"];
+const TRANSITION_TARGET = { activate: "active", freeze: "frozen", unfreeze: "active" };
+const ACTION_LABEL = { activate: "Activate card", freeze: "Freeze card", unfreeze: "Unfreeze card" };
+const FLAG_PROPAGATION_MS = 2500;
+
+let screen = null;
+let companyId = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (value) => String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const money = ({ amount, currency }) =>
+  new Intl.NumberFormat("sv-SE", { style: "currency", currency, maximumFractionDigits: amount % 100 ? 2 : 0 }).format(amount / 100);
+const plainAmount = ({ amount }) => new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 0 }).format(amount / 100);
+const when = (iso) => new Date(iso).toLocaleString("sv-SE", { dateStyle: "medium", timeStyle: "short" });
+
+function showProblem(status, body) {
+  $("problem-panel").hidden = false;
+  $("problem-panel").classList.add("problem");
+  $("problem").textContent = `HTTP ${status}\n${typeof body === "string" ? body : JSON.stringify(body, null, 2)}`;
+}
+function clearProblem() { $("problem-panel").hidden = true; }
+
+async function call(url, options = {}) {
+  const started = performance.now();
+  const response = await fetch(url, options);
+  const text = await response.text();
+  let body = text;
+  try { body = text ? JSON.parse(text) : null; } catch { /* keep text */ }
+  return { response, body, ms: Math.round(performance.now() - started) };
+}
+
+function received({ response, body, ms }) {
+  $("sources").textContent = `Qred-Data-Sources: ${response.headers.get("qred-data-sources") ?? "(not sent)"}`;
+  if (!response.ok) { showProblem(response.status, body); return false; }
+  clearProblem();
+  screen = body;
+  companyId = body.companySwitcher.selectedCompanyId;
+  $("timing").textContent = `${response.status} in ${ms} ms`;
+  $("payload").textContent = JSON.stringify(body, null, 2);
+  render();
+  return true;
+}
+
+async function loadScreen() {
+  const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+  received(await call(`/bff/screens/card-overview${query}`));
+}
+
+// A section listed in `unavailable` stays loading, never empty (the contract's rule).
+const unavailable = (name) => screen.unavailable.includes(name);
+const skeleton = (height = 64) => `<div class="skeleton" style="min-height:${height}px"></div>`;
+
+function renderInvoice() {
+  if (unavailable("invoiceDue")) return skeleton(40);
+  const invoice = screen.invoiceDue;
+  if (!invoice) return "";
+  const overdue = invoice.status === "overdue";
+  return `<div class="box invoice ${overdue ? "overdue" : ""}">
+    <span>${overdue ? "Invoice overdue" : "Invoice due"} ${esc(invoice.dueDate)}</span><strong>${esc(money(invoice.amount))}</strong></div>`;
+}
+
+function renderCard(card) {
+  return `<div class="card">
+    <div class="row"><strong>qred</strong><span class="badge ${esc(card.status)}">${esc(card.status)}</span></div>
+    <div class="number">•••• •••• •••• ${esc(card.last4)}</div>
+    <div class="row"><span>${esc(card.holderName)}</span><span>${esc(card.expiry)}</span></div>
+  </div>`;
+}
+
+function renderSpend() {
+  if (unavailable("spend")) return skeleton(96);
+  const { remaining, spendingLimit } = screen.spend;
+  const share = spendingLimit.amount ? Math.min(100, (remaining.amount / spendingLimit.amount) * 100) : 0;
+  return `<div class="box">
+    <p class="label">Remaining spend</p>
+    <p class="spend-value">${esc(plainAmount(remaining))}/${esc(money(spendingLimit))}</p>
+    <div class="meter"><div style="width:${share}%"></div></div>
+    <p class="hint">based on your set limit</p>
+  </div>`;
+}
+
+function renderTransactions() {
+  if (unavailable("latestTransactions")) return skeleton(160);
+  const { items, moreCount } = screen.latestTransactions;
+  const rows = items.length
+    ? items.map((t) => `<div class="tx"><span>${esc(t.merchantName)}${t.status === "pending" ? '<span class="pending">PENDING</span>' : ""}
+        <small>${esc(when(t.occurredAt))}</small></span><strong>${esc(money(t.amount))}</strong></div>`).join("")
+    : '<div class="empty">No transactions yet</div>';
+  const more = moreCount ? `<span class="more">${moreCount} more items in transaction view ›</span>` : "";
+  return `<div class="box"><p class="label">Latest transactions</p>${rows}${more}</div>`;
+}
+
+function render() {
+  const { companySwitcher, card } = screen;
+  const companies = companySwitcher.companies
+    .map((c) => `<option value="${esc(c.id)}" ${c.id === companySwitcher.selectedCompanyId ? "selected" : ""}>${esc(c.name)}</option>`)
+    .join("");
+  const actions = card
+    ? card.actions.map((a) => `<button data-action="${esc(a)}">${esc(ACTION_LABEL[a] ?? a)}</button>`).join("")
+    : "";
+  $("phone").innerHTML = `
+    <div class="topbar"><span>qred.</span><span>Menu</span></div>
+    <select id="company" aria-label="Company">${companies}</select>
+    ${renderInvoice()}
+    ${card ? renderCard(card) + renderSpend() + renderTransactions() : '<div class="box empty">No card issued in this company</div>'}
+    <div class="actions">${actions}<button class="secondary" disabled>Contact Qred's support</button></div>`;
+  $("company").addEventListener("change", (e) => { companyId = e.target.value; loadScreen(); });
+  for (const button of $("phone").querySelectorAll("[data-action]")) {
+    button.addEventListener("click", () => changeCard(button.dataset.action));
+  }
+}
+
+async function changeCard(action) {
+  received(await call(`/bff/cards/${encodeURIComponent(screen.card.id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "If-Match": screen.card.etag },
+    body: JSON.stringify({ status: TRANSITION_TARGET[action] }),
+  }));
+}
+
+async function loadFlags() {
+  const { body } = await call("/flags");
+  $("flags").innerHTML = UPSTREAMS.map((u) => {
+    const real = body?.[u];
+    return `<div class="flag"><span>${u} API <span class="source ${real ? "real" : "mock"}">${real ? "real" : "mock"}</span></span>
+      <span class="switch">
+        <button data-upstream="${u}" data-real="false" aria-pressed="${real === false}">mock</button>
+        <button data-upstream="${u}" data-real="true" aria-pressed="${real === true}">real</button>
+      </span></div>`;
+  }).join("");
+  for (const button of $("flags").querySelectorAll("button")) {
+    button.addEventListener("click", () => setFlag(button.dataset.upstream, button.dataset.real === "true"));
+  }
+}
+
+async function setFlag(upstream, real) {
+  for (const b of $("flags").querySelectorAll("button")) b.disabled = true;
+  const { response, body } = await call(`/flags/${upstream}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ real }),
+  });
+  if (!response.ok) showProblem(response.status, body);
+  $("sources").textContent = "applying: the App BFF refreshes its flags every 2 s";
+  await new Promise((resolve) => setTimeout(resolve, FLAG_PROPAGATION_MS));
+  await Promise.all([loadFlags(), loadScreen()]);
+}
+
+$("purchase").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!screen?.card) { showProblem("-", "No card in this company."); return; }
+  const { response, body } = await call("/purchases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      cardId: screen.card.id,
+      amount: Math.round(Number($("amount").value) * 100),
+      currency: screen.spend?.spendingLimit.currency ?? "SEK",
+      merchantName: $("merchant").value,
+    }),
+  });
+  if (!response.ok) { showProblem(response.status, body); return; }
+  await loadScreen();
+});
+
+loadFlags();
+loadScreen();
+</script>
+</body>
+</html>

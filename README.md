@@ -20,6 +20,8 @@ Then ask the App BFF for the screen (`anna` is a demo principal, see [ADR 0003](
 curl -H 'Authorization: Bearer anna' localhost:3000/screens/card-overview
 ```
 
+Or open the demo harness at [localhost:3100](http://localhost:3100): a dev-only page that renders the Screen, switches each upstream between mock and real, activates or freezes the Card, and simulates purchases as the Card processor.
+
 A fresh stack serves every upstream from its contract mock. Open Unleash at [localhost:4242](http://localhost:4242) (`admin` / `unleash4all`) and turn on `bff-identity-api-real`, `bff-card-api-real` or `bff-billing-api-real` to switch that upstream to the real service. The response header `Qred-Data-Sources` shows which served it ([ADR 0004](docs/adr/0004-flagged-upstream-sources-in-bff.md)).
 
 ## Services
@@ -32,6 +34,7 @@ A fresh stack serves every upstream from its contract mock. Open Unleash at [loc
 | Billing API | 3003 | [billing-api.yaml](contracts/billing-api.yaml) | Invoices |
 | Contract mocks | 4001-4003 | same contracts | Prism mocks of Identity, Card and Billing |
 | App BFF mock | 4000 | app-bff.yaml | For frontend work before the BFF exists: `pnpm compose --profile mock up` |
+| Demo harness | 3100 | | Dev-only page: the Screen, flag switches, simulated purchases |
 | Unleash | 4242 | | Feature flags for the BFF's upstream sources |
 | Postgres | internal | | One database per service |
 
@@ -43,6 +46,7 @@ apps/
   identity-api/     \
   card-api/          > domain services: handlers, domain rules, migrations, seed
   billing-api/      /
+  demo/             dev-only demo harness: one static page and a small server
 packages/
   service-kit/      shared plumbing: contract-driven Fastify, auth seam, problem+json, Kysely
 contracts/          OpenAPI contracts, the source of truth for routes, validation and types
