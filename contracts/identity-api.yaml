@@ -29,6 +29,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
 components:
   securitySchemes:
@@ -80,6 +81,11 @@ components:
   responses:
     Unauthorized:
       description: Missing or unknown principal.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: The caller is a client principal, not a User.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }

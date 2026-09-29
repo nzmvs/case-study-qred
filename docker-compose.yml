@@ -34,10 +34,13 @@ services:
     environment:
       PORT: 3001
       DATABASE_URL: postgres://identity:identity@postgres:5432/identity
+      AUTH_PRINCIPALS: *principals
     ports: ["3001:3001"]
     develop:
       watch:
         - { action: sync, path: ./apps/identity-api/src, target: /repo/apps/identity-api/src }
+        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/identity-api/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 

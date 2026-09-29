@@ -54,9 +54,25 @@ importers:
 
   apps/identity-api:
     dependencies:
+      '@qred/service-kit':
+        specifier: workspace:*
+        version: link:../../packages/service-kit
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
+      kysely:
+        specifier: ^0.29.6
+        version: 0.29.6
+    devDependencies:
+      kysely-codegen:
+        specifier: ^0.20.0
+        version: 0.20.0(kysely@0.29.6)(pg@8.23.0)(typescript@5.9.3)
+      openapi-typescript:
+        specifier: ^7.13.0
+        version: 7.13.0(typescript@5.9.3)
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
 
   packages/service-kit:
     dependencies:
