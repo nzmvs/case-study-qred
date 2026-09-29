@@ -6,6 +6,11 @@ x-principals: &principals >-
 
 x-app: &app
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$$PORT/health >/dev/null"]
+    interval: 2s
+    timeout: 2s
+    retries: 30
 
 x-mock: &mock
   build: ./infra/prism
@@ -85,12 +90,18 @@ services:
       IDENTITY_API_URL: http://identity-api:3001
       CARD_API_URL: http://card-api:3002
       BILLING_API_URL: http://billing-api:3003
+      AUTH_PRINCIPALS: *principals
     ports: ["3000:3000"]
     develop:
       watch:
         - { action: sync, path: ./apps/app-bff/src, target: /repo/apps/app-bff/src }
+        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/app-bff/package.json }
-    depends_on: [identity-api, card-api, billing-api]
+    depends_on:
+      identity-api: { condition: service_healthy }
+      card-api: { condition: service_healthy }
+      billing-api: { condition: service_healthy }
 
   mock-app-bff:
     <<: *mock
