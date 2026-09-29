@@ -1,26 +1,11 @@
-import { createDatabase } from "./database.js";
-import { migrateToLatest } from "./migrate.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { runDbCli } from "@qred/service-kit";
+import type { DB } from "./types.js";
 import { reseed, seedIfEmpty } from "./seed.js";
 
-const commands = {
-  migrate: migrateToLatest,
-  seed: seedIfEmpty,
-  reset: reseed,
-} as const;
-
-const command = process.argv[2] as keyof typeof commands | undefined;
-if (!command || !(command in commands)) {
-  console.error(`usage: cli <${Object.keys(commands).join("|")}>`);
-  process.exit(2);
-}
-
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is not set");
-
-const db = createDatabase(connectionString);
-try {
-  await commands[command](db);
-  console.log(`db ${command}: done`);
-} finally {
-  await db.destroy();
-}
+await runDbCli<DB>({
+  migrationFolder: path.join(path.dirname(fileURLToPath(import.meta.url)), "migrations"),
+  seedIfEmpty: (db) => seedIfEmpty(db),
+  reseed: (db) => reseed(db),
+});

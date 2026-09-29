@@ -8,6 +8,7 @@ COPY apps/identity-api/package.json apps/identity-api/
 COPY apps/card-api/package.json apps/card-api/
 COPY apps/billing-api/package.json apps/billing-api/
 COPY apps/app-bff/package.json apps/app-bff/
+COPY packages/service-kit/package.json packages/service-kit/
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS dev
@@ -19,7 +20,7 @@ CMD ["sh", "-c", "pnpm --filter @qred/${APP} dev"]
 FROM deps AS build
 ARG APP
 COPY . .
-RUN pnpm --filter @qred/${APP} build \
+RUN pnpm --filter "@qred/${APP}..." build \
  && pnpm --filter @qred/${APP} deploy --prod --legacy /out
 
 FROM node:22-alpine AS prod

@@ -1,0 +1,25 @@
+{
+  "name": "@qred/service-kit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fastify": "^5.12.5",
+    "fastify-openapi-glue": "^4.11.5",
+    "kysely": "^0.29.6",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

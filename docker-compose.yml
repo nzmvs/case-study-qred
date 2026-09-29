@@ -53,6 +53,7 @@ services:
       watch:
         - { action: sync, path: ./apps/card-api/src, target: /repo/apps/card-api/src }
         - { action: sync, path: ./apps/card-api/test, target: /repo/apps/card-api/test }
+        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
         - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/card-api/package.json }
     depends_on: { postgres: { condition: service_healthy } }

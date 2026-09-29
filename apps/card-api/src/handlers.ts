@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { type Selectable, sql, type Transaction as DbTransaction } from "kysely";
-import type { Principal } from "./auth.js";
 import { type CardRow, etagOf, toCard } from "./cards/representation.js";
 import type { Database } from "./db/database.js";
 import type { DB, Transactions } from "./db/types.js";
 import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
 import { spendPeriodOf } from "./domain/spend-period.js";
 import type { components, operations } from "./generated/card-api.js";
-import { badRequest, cardNotActive, forbidden, notFound, preconditionFailed, unprocessable } from "./problems.js";
+import { badRequest, forbidden, type Principal, unprocessable } from "@qred/service-kit";
+import { cardNotActive, cardNotFound, staleCard } from "./problems.js";
 
 type Op = keyof operations;
 type Path<K extends Op> = NonNullable<operations[K]["parameters"]["path"]>;
@@ -66,7 +66,7 @@ async function spentBetween(db: Database | DbTransaction<DB>, cardId: string, fr
 export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
   async function findVisible(cardId: string, principal: Principal): Promise<CardRow> {
     const row = await db.selectFrom("cards").selectAll().where("id", "=", cardId).executeTakeFirst();
-    if (!row || !visibleTo(row, principal)) throw notFound();
+    if (!row || !visibleTo(row, principal)) throw cardNotFound();
     return row;
   }
 
@@ -102,11 +102,11 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
       const { settings, state } = request.body;
       return db.transaction().execute(async (tx) => {
         const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
-        if (!row || !visibleTo(row, request.principal)) throw notFound();
+        if (!row || !visibleTo(row, request.principal)) throw cardNotFound();
 
         const now = clock();
         const current = toCard(row, now);
-        if (etagOf(current) !== request.headers["if-match"]) throw preconditionFailed();
+        if (etagOf(current) !== request.headers["if-match"]) throw staleCard();
 
         const transition = resolveTransition(current.state.status, state.status);
         if (state.status === CardStatus.Closed) {
@@ -197,7 +197,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
       // The Card row lock serialises purchases on one Card, so concurrent ones cannot jointly exceed the limit.
       const created = await db.transaction().execute(async (tx) => {
         const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
-        if (!row) throw notFound();
+        if (!row) throw cardNotFound();
 
         const status = effectiveStatus(row.status as CardStatus, row.expiresAt, clock());
         if (status !== CardStatus.Active) throw cardNotActive(status);

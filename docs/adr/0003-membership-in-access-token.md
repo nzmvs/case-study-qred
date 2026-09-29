@@ -9,4 +9,4 @@ The Identity API owns Memberships and issues signed JWTs whose claims list the C
 
 ## In this case
 
-Token issuance and verification are mocked: every service resolves the bearer token as a demo principal name (`anna`, `card-processor`) from shared configuration into the same `Principal` the JWT verification would produce. Membership and scope checks run against that `Principal` unchanged, so replacing the mock with JWT verification touches only each service's auth plugin.
+Token issuance and verification are mocked: every service resolves the bearer token as a demo principal name (`anna`, `card-processor`) from shared configuration into the same `Principal` the JWT verification would produce. Membership and scope checks run against that `Principal` unchanged, so replacing the mock with JWT verification touches only `packages/service-kit/src/auth.ts`.

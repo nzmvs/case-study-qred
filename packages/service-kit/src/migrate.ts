@@ -1,16 +1,15 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Kysely } from "kysely";
 import { FileMigrationProvider, Migrator } from "kysely/migration";
 
-export async function migrateToLatest(db: Kysely<any>): Promise<void> {
+export async function migrateToLatest(db: Kysely<any>, migrationFolder: string): Promise<void> {
   const migrator = new Migrator({
     db,
     provider: new FileMigrationProvider({
       fs,
       path,
-      migrationFolder: path.join(path.dirname(fileURLToPath(import.meta.url)), "migrations"),
+      migrationFolder,
     }),
   });
   const { error, results } = await migrator.migrateToLatest();
