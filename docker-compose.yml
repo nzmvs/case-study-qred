@@ -1,0 +1,73 @@
+x-app: &app
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  identity-api:
+    <<: *app
+    build: { context: ., target: dev, args: { APP: identity-api } }
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://identity:identity@postgres:5432/identity
+    ports: ["3001:3001"]
+    develop:
+      watch:
+        - { action: sync, path: ./apps/identity-api/src, target: /repo/apps/identity-api/src }
+        - { action: rebuild, path: ./apps/identity-api/package.json }
+    depends_on: { postgres: { condition: service_healthy } }
+
+  card-api:
+    <<: *app
+    build: { context: ., target: dev, args: { APP: card-api } }
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgres://card:card@postgres:5432/card
+    ports: ["3002:3002"]
+    develop:
+      watch:
+        - { action: sync, path: ./apps/card-api/src, target: /repo/apps/card-api/src }
+        - { action: rebuild, path: ./apps/card-api/package.json }
+    depends_on: { postgres: { condition: service_healthy } }
+
+  billing-api:
+    <<: *app
+    build: { context: ., target: dev, args: { APP: billing-api } }
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgres://billing:billing@postgres:5432/billing
+    ports: ["3003:3003"]
+    develop:
+      watch:
+        - { action: sync, path: ./apps/billing-api/src, target: /repo/apps/billing-api/src }
+        - { action: rebuild, path: ./apps/billing-api/package.json }
+    depends_on: { postgres: { condition: service_healthy } }
+
+  app-bff:
+    <<: *app
+    build: { context: ., target: dev, args: { APP: app-bff } }
+    environment:
+      PORT: 3000
+      IDENTITY_API_URL: http://identity-api:3001
+      CARD_API_URL: http://card-api:3002
+      BILLING_API_URL: http://billing-api:3003
+    ports: ["3000:3000"]
+    develop:
+      watch:
+        - { action: sync, path: ./apps/app-bff/src, target: /repo/apps/app-bff/src }
+        - { action: rebuild, path: ./apps/app-bff/package.json }
+    depends_on: [identity-api, card-api, billing-api]
+
+volumes:
+  pgdata:
