@@ -17,8 +17,8 @@
     "db:reset": "for s in identity-api card-api billing-api; do pnpm compose exec -T $s pnpm --filter @qred/$s db:reset; done",
     "gen": "pnpm -r gen:api",
     "lint:contracts": "pnpm --package=@redocly/cli dlx redocly lint contracts/*.yaml",
-    "test:contract": "bash scripts/contract-tests.sh",
-    "test:smoke": "bash scripts/smoke.sh",
+    "test:contract": "python3 scripts/contract_tests.py",
+    "test:smoke": "python3 scripts/smoke.py",
     "start": "pnpm compose up --build --wait --detach"
   },
   "devDependencies": {

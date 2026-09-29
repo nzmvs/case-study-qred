@@ -52,7 +52,7 @@ packages/
 contracts/          OpenAPI contracts, the source of truth for routes, validation and types
 infra/              Dockerfile, docker-compose.yml, Postgres init, Prism image, Unleash seed
 tests/contract/     Schemathesis configuration per service
-scripts/            contract and smoke test runners
+scripts/            contract and smoke test runners (Python 3.9+, standard library only)
 docs/adr/           architecture decisions
 CONTEXT.md          domain glossary
 ```

@@ -8,3 +8,9 @@ missing_required_header.expected-statuses = ["400", "401", "403", "428"]
 [parameters]
 cardId = "00000000-0000-4000-a000-000000000202"
 companyId = "00000000-0000-4000-a000-000000000101"
+
+# Changing a Card is stateful: with the Card API real, an ETag not from the latest read is 412 and a
+# transition the current status does not allow is 409.
+[[operations]]
+include-name = "PUT /cards/{cardId}"
+checks = { positive_data_acceptance = { expected-statuses = ["200", "401", "404", "409", "412"] } }
