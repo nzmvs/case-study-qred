@@ -7,6 +7,7 @@ Unleash UI survive restarts.
 import json
 import os
 import sys
+import time
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError
 from urllib.request import HTTPCookieProcessor, Request, build_opener
@@ -28,14 +29,38 @@ FLAGS = {
 session = build_opener(HTTPCookieProcessor(CookieJar()))
 
 
-def post(url: str, body: dict | None = None) -> int:
+def send(url: str, body: dict | None = None) -> tuple[int, dict]:
     data = json.dumps(body).encode() if body is not None else None
     request = Request(url, data=data, method="POST", headers={"Content-Type": "application/json"})
     try:
         with session.open(request) as response:
-            return response.status
+            return response.status, dict(response.headers)
     except HTTPError as error:
-        return error.code
+        return error.code, dict(error.headers)
+
+
+def sign_in() -> None:
+    credentials = {
+        "username": os.environ.get("UNLEASH_ADMIN_USER", "admin"),
+        "password": os.environ.get("UNLEASH_ADMIN_PASSWORD", "unleash4all"),
+    }
+    # Unleash rate-limits sign-ins, which quick restarts of the stack can hit.
+    for _ in range(5):
+        status, headers = send(f"{UNLEASH_URL}/auth/simple/login", credentials)
+        if status != 429:
+            break
+        time.sleep(int(headers.get("Retry-After", "5")))
+    if status != 200:
+        sys.exit(f"admin sign-in failed ({status})")
+
+
+def post(url: str, body: dict | None = None) -> int:
+    # Unleash occasionally rejects a session right after sign-in (cause not found); sign in again once.
+    status, _ = send(url, body)
+    if status == 401:
+        sign_in()
+        status, _ = send(url, body)
+    return status
 
 
 def create_flag(name: str, enabled: bool) -> None:
@@ -58,12 +83,7 @@ def create_flag(name: str, enabled: bool) -> None:
 
 
 def main() -> None:
-    credentials = {
-        "username": os.environ.get("UNLEASH_ADMIN_USER", "admin"),
-        "password": os.environ.get("UNLEASH_ADMIN_PASSWORD", "unleash4all"),
-    }
-    if (status := post(f"{UNLEASH_URL}/auth/simple/login", credentials)) != 200:
-        sys.exit(f"admin sign-in failed ({status})")
+    sign_in()
     for name, enabled in FLAGS.items():
         create_flag(name, enabled)
 
