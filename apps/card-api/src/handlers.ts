@@ -106,7 +106,9 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
 
         const now = clock();
         const current = toCard(row, now);
-        if (etagOf(current) !== request.headers["if-match"]) throw staleCard();
+        const ifMatch = request.headers["if-match"];
+        // RFC 9110: `*` matches any current representation.
+        if (ifMatch !== "*" && ifMatch !== etagOf(current)) throw staleCard();
 
         const transition = resolveTransition(current.state.status, state.status);
         if (state.status === CardStatus.Closed) {
@@ -142,7 +144,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
       const row = await findVisible(request.params.cardId, request.principal);
       const from = new Date(request.query.from);
       const to = new Date(request.query.to);
-      if (!(from < to)) throw badRequest("`to` must be after `from`.");
+      if (to < from) throw badRequest("`to` must not be before `from`.");
 
       const spent = await spentBetween(db, row.id, from, to);
       return { from: request.query.from, to: request.query.to, spent: { amount: spent, currency: row.currency } };

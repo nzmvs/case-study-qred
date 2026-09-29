@@ -1,3 +1,4 @@
+import { STATUS_CODES } from "node:http";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 
 const PROBLEM_BASE = "https://api.qred.example/problems";
@@ -63,6 +64,10 @@ export function problemHandler(mapError: ErrorMapper = () => undefined) {
     }
     if (error.statusCode === 401) {
       return send(reply, new Problem(401, "unauthenticated", "Unauthenticated", "Missing or unknown principal."));
+    }
+    // Fastify's own client errors (malformed JSON, a forbidden __proto__ key, a bad Content-Length...).
+    if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+      return send(reply, new Problem(error.statusCode, "client-error", STATUS_CODES[error.statusCode] ?? "Client error", error.message));
     }
     request.log.error(error);
     return send(reply, new Problem(500, "internal", "Internal server error"));

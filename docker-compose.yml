@@ -46,6 +46,7 @@ services:
         - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
         - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/identity-api/package.json }
+        - { action: rebuild, path: ./packages/service-kit/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
   card-api:
@@ -63,6 +64,7 @@ services:
         - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
         - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/card-api/package.json }
+        - { action: rebuild, path: ./packages/service-kit/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
   billing-api:
@@ -79,6 +81,7 @@ services:
         - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
         - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/billing-api/package.json }
+        - { action: rebuild, path: ./packages/service-kit/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
   app-bff:
@@ -105,6 +108,7 @@ services:
         - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
         - { action: sync+restart, path: ./contracts, target: /repo/contracts }
         - { action: rebuild, path: ./apps/app-bff/package.json }
+        - { action: rebuild, path: ./packages/service-kit/package.json }
     depends_on:
       identity-api: { condition: service_healthy }
       card-api: { condition: service_healthy }

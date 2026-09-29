@@ -60,7 +60,8 @@ export interface paths {
          * What a Card spent in a time range
          * @description Sum of pending and settled Transactions with `occurredAt` in
          *     [`from`, `to`). Reversed Transactions do not count. Callers decide
-         *     the range; the Spend period is computed by the caller.
+         *     the range; the current Spend period is the UTC calendar month
+         *     (ADR 0005).
          */
         get: operations["getCardSpend"];
         put?: never;
@@ -90,7 +91,7 @@ export interface paths {
          *     principal `card-processor`); User principals are rejected with `403`. The
          *     Transaction starts `pending`. Rejected when the Card is not `active`
          *     or the amount exceeds the Card's Remaining spend in the Spend period
-         *     that contains `occurredAt`.
+         *     (the UTC calendar month, ADR 0005) that contains `occurredAt`.
          */
         post: operations["createCardTransaction"];
         delete?: never;
@@ -192,8 +193,7 @@ export interface components {
             settings: components["schemas"]["CardSettings"];
             /**
              * @description A changed `status` must be one of `allowedTransitions` (`409`
-             *     otherwise). `closedReason` is required exactly when `status` is
-             *     `closed` (`422` otherwise).
+             *     otherwise). `closedReason` is given exactly when closing.
              */
             state: {
                 status: components["schemas"]["CardStatus"];
@@ -243,11 +243,55 @@ export interface components {
         };
         TransactionInput: {
             /** @description Positive; currency must equal the Card's `details.currency`. */
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["Money"] & {
+                amount?: number;
+            };
+            /** @description Printable text; control characters are rejected. */
             merchantName: string;
             /** Format: date-time */
             occurredAt: string;
         };
+        /**
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "00000000-0000-4000-a000-000000001057",
+         *           "cardId": "00000000-0000-4000-a000-000000000201",
+         *           "amount": {
+         *             "amount": 89500,
+         *             "currency": "SEK"
+         *           },
+         *           "merchantName": "SJ AB",
+         *           "occurredAt": "2026-09-28T14:42:00Z",
+         *           "status": "pending"
+         *         },
+         *         {
+         *           "id": "00000000-0000-4000-a000-000000001056",
+         *           "cardId": "00000000-0000-4000-a000-000000000201",
+         *           "amount": {
+         *             "amount": 34900,
+         *             "currency": "SEK"
+         *           },
+         *           "merchantName": "Clas Ohlson",
+         *           "occurredAt": "2026-09-27T09:05:00Z",
+         *           "status": "settled"
+         *         },
+         *         {
+         *           "id": "00000000-0000-4000-a000-000000001055",
+         *           "cardId": "00000000-0000-4000-a000-000000000201",
+         *           "amount": {
+         *             "amount": 6400,
+         *             "currency": "SEK"
+         *           },
+         *           "merchantName": "Espresso House",
+         *           "occurredAt": "2026-09-27T06:17:00Z",
+         *           "status": "settled"
+         *         }
+         *       ],
+         *       "totalCount": 57,
+         *       "nextCursor": "WyIyMDI2LTA5LTI3VDA2OjE3OjAwWiIsIjAwMDAwMDAwLTAwMDAtNDAwMC1hMDAwLTAwMDAwMDAwMTA1NSJd"
+         *     }
+         */
         TransactionPage: {
             items: components["schemas"]["Transaction"][];
             /** @description All Transactions on the Card. */
@@ -432,6 +476,7 @@ export interface operations {
                     "application/json": components["schemas"]["Card"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -491,7 +536,7 @@ export interface operations {
         parameters: {
             query: {
                 from: string;
-                /** @description Exclusive; must be after `from`. */
+                /** @description Exclusive; must not be before `from` (`400`). An empty range spends nothing. */
                 to: string;
             };
             header?: never;
@@ -520,7 +565,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
-                /** @description Opaque; `nextCursor` from the previous page. */
+                /** @description Opaque; `nextCursor` from the previous page. Any other value is `400`. */
                 cursor?: string;
             };
             header?: never;

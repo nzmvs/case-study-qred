@@ -1,0 +1,2 @@
+# Schemathesis: generated requests against the real Identity API, every response checked against its contract.
+headers = { Authorization = "Bearer anna" }
