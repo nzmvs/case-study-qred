@@ -14,7 +14,6 @@ x-app: &app
 
 x-mock: &mock
   build: ./infra/prism
-  profiles: [mock]
   restart: unless-stopped
   volumes:
     - ./contracts:/contracts:ro
@@ -90,6 +89,14 @@ services:
       IDENTITY_API_URL: http://identity-api:3001
       CARD_API_URL: http://card-api:3002
       BILLING_API_URL: http://billing-api:3003
+      # Dev only (ADR 0004): flags may route an upstream to its contract mock.
+      UPSTREAM_MOCKS_ALLOWED: "true"
+      IDENTITY_API_MOCK_URL: http://mock-identity-api:4010
+      CARD_API_MOCK_URL: http://mock-card-api:4010
+      BILLING_API_MOCK_URL: http://mock-billing-api:4010
+      UNLEASH_URL: http://unleash:4242/api
+      UNLEASH_TOKEN: default:development.unleash-insecure-backend-token
+      UNLEASH_REFRESH_MS: 2000
       AUTH_PRINCIPALS: *principals
     ports: ["3000:3000"]
     develop:
@@ -102,9 +109,12 @@ services:
       identity-api: { condition: service_healthy }
       card-api: { condition: service_healthy }
       billing-api: { condition: service_healthy }
+      unleash-seed: { condition: service_completed_successfully }
 
+  # For frontend work before the App BFF exists; the upstream mocks run by default for its flags.
   mock-app-bff:
     <<: *mock
+    profiles: [mock]
     command: ["/contracts/app-bff.yaml"]
     ports: ["4000:4010"]
 
@@ -122,6 +132,28 @@ services:
     <<: *mock
     command: ["/contracts/billing-api.yaml"]
     ports: ["4003:4010"]
+
+  unleash:
+    image: unleashorg/unleash-server:8.2
+    environment:
+      DATABASE_URL: postgres://unleash:unleash@postgres:5432/unleash
+      DATABASE_SSL: "false"
+      # Dev-only token, created on first start: project:environment.secret
+      INIT_BACKEND_API_TOKENS: "default:development.unleash-insecure-backend-token"
+    ports: ["4242:4242"]
+    depends_on: { postgres: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4242/health >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  unleash-seed:
+    image: curlimages/curl:8.17.0
+    entrypoint: ["/bin/sh", "/seed.sh"]
+    volumes: ["./infra/unleash/seed.sh:/seed.sh:ro"]
+    depends_on: { unleash: { condition: service_healthy } }
+    restart: "no"
 
 volumes:
   pgdata:

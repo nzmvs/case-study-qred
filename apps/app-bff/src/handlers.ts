@@ -1,7 +1,8 @@
-import { notFound } from "@qred/service-kit";
-import type { FastifyRequest } from "fastify";
+import { notFound, Unauthenticated } from "@qred/service-kit";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { operations } from "./generated/app-bff.js";
 import { assembleCardOverview, type CardOverviewScreen, currentSpendPeriod } from "./screen.js";
+import { describeSources, type Routing, route } from "./sources.js";
 import { badGateway, forwardProblem, optional, required, type Upstreams } from "./upstreams.js";
 
 type ScreenQuery = NonNullable<operations["getCardOverviewScreen"]["parameters"]["query"]>;
@@ -15,10 +16,24 @@ const OPEN_CARD_STATUSES = ["inactive", "active", "frozen"] as const;
 const DUE_INVOICE_STATUSES = ["open", "overdue"] as const;
 const FORWARDED_CARD_ERRORS = new Set([404, 409, 412]);
 
-export function bffHandlers({ upstreams, clock, timeoutMs }: { upstreams: Upstreams; clock: Clock; timeoutMs: number }) {
-  const { identity, card, billing } = upstreams;
+function userIdOf(request: FastifyRequest): string {
+  if (request.principal.kind !== "user") throw new Unauthenticated("The App BFF serves Users only.");
+  return request.principal.userId;
+}
 
-  async function loadCardOverview(authorization: string, companyId: string | undefined): Promise<CardOverviewScreen> {
+export function bffHandlers({ routing, clock, timeoutMs }: { routing: Routing; clock: Clock; timeoutMs: number }) {
+  /** Routes this request's upstreams and, where mocks are allowed, tells the client which served it. */
+  function routeFor(request: FastifyRequest, reply: FastifyReply): Upstreams {
+    const { upstreams, sources } = route(routing, userIdOf(request));
+    if (routing.mock) reply.header("Qred-Data-Sources", describeSources(sources));
+    return upstreams;
+  }
+
+  async function loadCardOverview(
+    { identity, card, billing }: Upstreams,
+    authorization: string,
+    companyId: string | undefined,
+  ): Promise<CardOverviewScreen> {
     const call = () => ({ headers: { authorization }, signal: AbortSignal.timeout(timeoutMs) });
 
     const { data: me } = await required("Identity API", identity.GET("/me", call()));
@@ -75,11 +90,13 @@ export function bffHandlers({ upstreams, clock, timeoutMs }: { upstreams: Upstre
   }
 
   return {
-    async getCardOverviewScreen(request: FastifyRequest<{ Querystring: ScreenQuery }>) {
-      return loadCardOverview(request.headers.authorization!, request.query.companyId);
+    async getCardOverviewScreen(request: FastifyRequest<{ Querystring: ScreenQuery }>, reply: FastifyReply) {
+      return loadCardOverview(routeFor(request, reply), request.headers.authorization!, request.query.companyId);
     },
 
-    async putCard(request: FastifyRequest<{ Params: PutCardPath; Headers: PutCardHeaders; Body: PutCardBody }>) {
+    async putCard(request: FastifyRequest<{ Params: PutCardPath; Headers: PutCardHeaders; Body: PutCardBody }>, reply: FastifyReply) {
+      const upstreams = routeFor(request, reply);
+      const { card } = upstreams;
       const authorization = request.headers.authorization!;
       const call = () => ({ headers: { authorization }, signal: AbortSignal.timeout(timeoutMs) });
       const path = { path: { cardId: request.params.cardId } };
@@ -101,7 +118,7 @@ export function bffHandlers({ upstreams, clock, timeoutMs }: { upstreams: Upstre
       if (FORWARDED_CARD_ERRORS.has(updated.response.status)) throw forwardProblem(updated.response.status, updated.error);
       if (!updated.response.ok) throw badGateway(`Card API answered ${updated.response.status}.`);
 
-      return loadCardOverview(authorization, current.data.details.companyId);
+      return loadCardOverview(upstreams, authorization, current.data.details.companyId);
     },
   };
 }
