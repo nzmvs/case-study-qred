@@ -2,6 +2,7 @@ import Fastify, { type FastifyServerOptions, type HTTPMethods, type preValidatio
 import { Ajv, type Options as AjvOptions } from "ajv";
 import addFormats from "ajv-formats";
 import openapiGlue from "fastify-openapi-glue";
+import qs from "qs";
 import { bearerAuth, type Principals } from "./auth.js";
 import { httpErrors } from "@fastify/sensible";
 import { type ErrorMapper, problemHandler } from "./problems.js";
@@ -15,23 +16,6 @@ type ServiceOptions = {
   mapError?: ErrorMapper;
   logger?: FastifyServerOptions["logger"];
 };
-
-/** The contracts' array query parameters use `style: form, explode: false`: `?status=a,b`. */
-function splitCommaSeparatedArrays(route: RouteOptions) {
-  const properties = (route.schema?.querystring as { properties?: Record<string, { type?: string }> } | undefined)?.properties;
-  const arrays = Object.entries(properties ?? {})
-    .filter(([, schema]) => schema.type === "array")
-    .map(([name]) => name);
-  if (arrays.length === 0) return;
-
-  const split: preValidationHookHandler = async (request) => {
-    const query = request.query as Record<string, unknown>;
-    for (const name of arrays) {
-      if (typeof query[name] === "string") query[name] = query[name] === "" ? [] : query[name].split(",");
-    }
-  };
-  route.preValidation = [split, ...[route.preValidation ?? []].flat()];
-}
 
 /**
  * Query, path and header values arrive as strings and are coerced to the contract's types; bodies are
@@ -74,7 +58,11 @@ function requireBody(route: RouteOptions) {
 }
 
 export async function buildService({ contractPath, serviceHandlers, principals, mapError, logger = false }: ServiceOptions) {
-  const app = Fastify({ logger });
+  const app = Fastify({
+    logger,
+    // The contracts' array query parameters use `style: form, explode: false`: `?status=a,b`.
+    routerOptions: { querystringParser: (query) => qs.parse(query, { comma: true }) },
+  });
   app.setValidatorCompiler(contractValidators());
   // The contracts accept JSON bodies only; Fastify's built-in text/plain parser would hand handlers a
   // string that no body schema validates. Without it, other media types are 415.
@@ -82,7 +70,6 @@ export async function buildService({ contractPath, serviceHandlers, principals, 
 
   const declared = new Map<string, Set<string>>();
   app.setErrorHandler(problemHandler(mapError));
-  app.addHook("onRoute", splitCommaSeparatedArrays);
   app.addHook("onRoute", requireBody);
   app.addHook("onRoute", rejectUnknownQuery);
   app.addHook("onRoute", (route) => {

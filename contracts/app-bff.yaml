@@ -8,6 +8,8 @@ info:
     units (öre) with an ISO 4217 currency.
 
     Errors use `application/problem+json` (RFC 9457).
+    Every path answers undeclared methods with `405 Method Not Allowed` and an
+    `Allow` header, and rejects unknown query parameters with `400`.
 servers:
   - url: http://localhost:3000
     description: Local (docker compose)
