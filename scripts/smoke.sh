@@ -39,6 +39,6 @@ check 403 "user records tx"       -X POST -H "$A" -H "$J" $B/cards/$C1/transacti
 check 422 "wrong currency"        -X POST -H "$P" -H "$J" $B/cards/$C1/transactions -d "$(tx 100 EUR)"
 check 422 "over the limit"        -X POST -H "$P" -H "$J" $B/cards/$C1/transactions -d "$(tx 540001)"
 check 201 "exactly the limit"     -X POST -H "$P" -H "$J" $B/cards/$C1/transactions -d "$(tx 540000)"
-cd "$(dirname "$0")/.." && docker compose exec -T card-api pnpm --filter @qred/card-api db:reset >/dev/null
+cd "$(dirname "$0")/.." && docker compose -f infra/docker-compose.yml exec -T card-api pnpm --filter @qred/card-api db:reset >/dev/null
 echo "failures: $fails"
 [ "$fails" -eq 0 ]

@@ -20,7 +20,7 @@ for service in "${services[@]}"; do
 done
 
 for service in identity-api card-api billing-api; do
-  docker compose exec -T "$service" pnpm --filter "@qred/$service" db:reset >/dev/null
+  docker compose -f infra/docker-compose.yml exec -T "$service" pnpm --filter "@qred/$service" db:reset >/dev/null
 done
 echo "seeds reset"
 

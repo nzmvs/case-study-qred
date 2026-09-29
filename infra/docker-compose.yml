@@ -1,3 +1,6 @@
+# Project name pinned: it would otherwise follow this file's directory (infra).
+name: qred
+
 # Mocked authentication (ADR 0003): bearer token -> demo principal, shared by every service.
 x-principals: &principals >-
   {"anna": {"kind": "user", "userId": "00000000-0000-4000-a000-000000000001",
@@ -13,10 +16,10 @@ x-app: &app
     retries: 30
 
 x-mock: &mock
-  build: ./infra/prism
+  build: ./prism
   restart: unless-stopped
   volumes:
-    - ./contracts:/contracts:ro
+    - ../contracts:/contracts:ro
 
 services:
   postgres:
@@ -25,7 +28,7 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - pgdata:/var/lib/postgresql
-      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -34,7 +37,7 @@ services:
 
   identity-api:
     <<: *app
-    build: { context: ., target: dev, args: { APP: identity-api } }
+    build: { context: .., dockerfile: infra/Dockerfile, target: dev, args: { APP: identity-api } }
     environment:
       PORT: 3001
       DATABASE_URL: postgres://identity:identity@postgres:5432/identity
@@ -42,16 +45,16 @@ services:
     ports: ["3001:3001"]
     develop:
       watch:
-        - { action: sync, path: ./apps/identity-api/src, target: /repo/apps/identity-api/src }
-        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
-        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
-        - { action: rebuild, path: ./apps/identity-api/package.json }
-        - { action: rebuild, path: ./packages/service-kit/package.json }
+        - { action: sync, path: ../apps/identity-api/src, target: /repo/apps/identity-api/src }
+        - { action: sync, path: ../packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ../contracts, target: /repo/contracts }
+        - { action: rebuild, path: ../apps/identity-api/package.json }
+        - { action: rebuild, path: ../packages/service-kit/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
   card-api:
     <<: *app
-    build: { context: ., target: dev, args: { APP: card-api } }
+    build: { context: .., dockerfile: infra/Dockerfile, target: dev, args: { APP: card-api } }
     environment:
       PORT: 3002
       DATABASE_URL: postgres://card:card@postgres:5432/card
@@ -59,17 +62,16 @@ services:
     ports: ["3002:3002"]
     develop:
       watch:
-        - { action: sync, path: ./apps/card-api/src, target: /repo/apps/card-api/src }
-        - { action: sync, path: ./apps/card-api/test, target: /repo/apps/card-api/test }
-        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
-        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
-        - { action: rebuild, path: ./apps/card-api/package.json }
-        - { action: rebuild, path: ./packages/service-kit/package.json }
+        - { action: sync, path: ../apps/card-api/src, target: /repo/apps/card-api/src }
+        - { action: sync, path: ../packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ../contracts, target: /repo/contracts }
+        - { action: rebuild, path: ../apps/card-api/package.json }
+        - { action: rebuild, path: ../packages/service-kit/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
   billing-api:
     <<: *app
-    build: { context: ., target: dev, args: { APP: billing-api } }
+    build: { context: .., dockerfile: infra/Dockerfile, target: dev, args: { APP: billing-api } }
     environment:
       PORT: 3003
       DATABASE_URL: postgres://billing:billing@postgres:5432/billing
@@ -77,16 +79,16 @@ services:
     ports: ["3003:3003"]
     develop:
       watch:
-        - { action: sync, path: ./apps/billing-api/src, target: /repo/apps/billing-api/src }
-        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
-        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
-        - { action: rebuild, path: ./apps/billing-api/package.json }
-        - { action: rebuild, path: ./packages/service-kit/package.json }
+        - { action: sync, path: ../apps/billing-api/src, target: /repo/apps/billing-api/src }
+        - { action: sync, path: ../packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ../contracts, target: /repo/contracts }
+        - { action: rebuild, path: ../apps/billing-api/package.json }
+        - { action: rebuild, path: ../packages/service-kit/package.json }
     depends_on: { postgres: { condition: service_healthy } }
 
   app-bff:
     <<: *app
-    build: { context: ., target: dev, args: { APP: app-bff } }
+    build: { context: .., dockerfile: infra/Dockerfile, target: dev, args: { APP: app-bff } }
     environment:
       PORT: 3000
       IDENTITY_API_URL: http://identity-api:3001
@@ -104,11 +106,11 @@ services:
     ports: ["3000:3000"]
     develop:
       watch:
-        - { action: sync, path: ./apps/app-bff/src, target: /repo/apps/app-bff/src }
-        - { action: sync, path: ./packages/service-kit/src, target: /repo/packages/service-kit/src }
-        - { action: sync+restart, path: ./contracts, target: /repo/contracts }
-        - { action: rebuild, path: ./apps/app-bff/package.json }
-        - { action: rebuild, path: ./packages/service-kit/package.json }
+        - { action: sync, path: ../apps/app-bff/src, target: /repo/apps/app-bff/src }
+        - { action: sync, path: ../packages/service-kit/src, target: /repo/packages/service-kit/src }
+        - { action: sync+restart, path: ../contracts, target: /repo/contracts }
+        - { action: rebuild, path: ../apps/app-bff/package.json }
+        - { action: rebuild, path: ../packages/service-kit/package.json }
     depends_on:
       identity-api: { condition: service_healthy }
       card-api: { condition: service_healthy }
@@ -155,7 +157,7 @@ services:
   unleash-seed:
     image: python:3.13-alpine
     command: ["python", "/seed.py"]
-    volumes: ["./infra/unleash/seed.py:/seed.py:ro"]
+    volumes: ["./unleash/seed.py:/seed.py:ro"]
     depends_on: { unleash: { condition: service_healthy } }
     restart: "no"
 

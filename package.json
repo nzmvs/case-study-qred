@@ -4,15 +4,25 @@
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "compose": "docker compose -f infra/docker-compose.yml",
+    "dev": "pnpm compose up --build --watch",
+    "down": "pnpm compose --profile mock down",
+    "logs": "pnpm compose logs --follow",
+    "db:reset": "for s in identity-api card-api billing-api; do pnpm compose exec -T $s pnpm --filter @qred/$s db:reset; done",
+    "gen": "pnpm -r gen:api",
+    "lint:contracts": "pnpm --package=@redocly/cli dlx redocly lint contracts/*.yaml",
+    "test:contract": "bash scripts/contract-tests.sh",
+    "test:smoke": "bash scripts/smoke.sh",
+    "start": "pnpm compose up --build --wait --detach"
   },
   "devDependencies": {
-    "@types/node": "^22.20.4",
+    "@types/node": "^24.19.0",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3"
   }

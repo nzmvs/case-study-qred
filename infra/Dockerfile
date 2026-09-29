@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 RUN corepack enable
 WORKDIR /repo
 
@@ -23,7 +23,7 @@ COPY . .
 RUN pnpm --filter "@qred/${APP}..." build \
  && pnpm --filter @qred/${APP} deploy --prod --legacy /out
 
-FROM node:22-alpine AS prod
+FROM node:24-alpine AS prod
 ARG APP
 WORKDIR /app
 COPY --from=build /out .
