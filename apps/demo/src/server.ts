@@ -5,19 +5,35 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import envSchema from "env-schema";
 import Fastify, { type FastifyReply } from "fastify";
 
-function env(name: string, fallback?: string): string {
-  const value = process.env[name] ?? fallback;
-  if (!value) throw new Error(`${name} is not set`);
-  return value;
-}
-
-const APP_BFF_URL = env("APP_BFF_URL");
-const CARD_API_URL = env("CARD_API_URL");
-const UNLEASH_URL = env("UNLEASH_URL");
-const USER_PRINCIPAL = env("DEMO_USER_PRINCIPAL", "anna");
-const PROCESSOR_PRINCIPAL = env("DEMO_PROCESSOR_PRINCIPAL", "card-processor");
+const url = { type: "string", minLength: 1 } as const;
+const config = envSchema<{
+  PORT: number;
+  APP_BFF_URL: string;
+  CARD_API_URL: string;
+  UNLEASH_URL: string;
+  UNLEASH_ADMIN_USER: string;
+  UNLEASH_ADMIN_PASSWORD: string;
+  DEMO_USER_PRINCIPAL: string;
+  DEMO_PROCESSOR_PRINCIPAL: string;
+}>({
+  schema: {
+    type: "object",
+    required: ["APP_BFF_URL", "CARD_API_URL", "UNLEASH_URL"],
+    properties: {
+      PORT: { type: "integer", default: 3100 },
+      APP_BFF_URL: url,
+      CARD_API_URL: url,
+      UNLEASH_URL: url,
+      UNLEASH_ADMIN_USER: { type: "string", default: "admin" },
+      UNLEASH_ADMIN_PASSWORD: { type: "string", default: "unleash4all" },
+      DEMO_USER_PRINCIPAL: { type: "string", default: "anna" },
+      DEMO_PROCESSOR_PRINCIPAL: { type: "string", default: "card-processor" },
+    },
+  },
+});
 const PAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../public/index.html");
 
 const UPSTREAMS = ["identity", "card", "billing"] as const;
@@ -29,10 +45,10 @@ const isUpstream = (value: string): value is Upstream => (UPSTREAMS as readonly 
 let unleashSession: string | undefined;
 
 async function signIn(): Promise<string> {
-  const response = await fetch(`${UNLEASH_URL}/auth/simple/login`, {
+  const response = await fetch(`${config.UNLEASH_URL}/auth/simple/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: env("UNLEASH_ADMIN_USER", "admin"), password: env("UNLEASH_ADMIN_PASSWORD", "unleash4all") }),
+    body: JSON.stringify({ username: config.UNLEASH_ADMIN_USER, password: config.UNLEASH_ADMIN_PASSWORD }),
   });
   const cookie = response.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
   if (!response.ok || !cookie) throw new Error(`Unleash sign-in failed (${response.status})`);
@@ -41,10 +57,10 @@ async function signIn(): Promise<string> {
 
 async function unleashAdmin(path: string, method = "GET"): Promise<Response> {
   unleashSession ??= await signIn();
-  let response = await fetch(`${UNLEASH_URL}/api/admin/projects/default/features${path}`, { method, headers: { Cookie: unleashSession } });
+  let response = await fetch(`${config.UNLEASH_URL}/api/admin/projects/default/features${path}`, { method, headers: { Cookie: unleashSession } });
   if (response.status === 401) {
     unleashSession = await signIn();
-    response = await fetch(`${UNLEASH_URL}/api/admin/projects/default/features${path}`, { method, headers: { Cookie: unleashSession } });
+    response = await fetch(`${config.UNLEASH_URL}/api/admin/projects/default/features${path}`, { method, headers: { Cookie: unleashSession } });
   }
   return response;
 }
@@ -68,8 +84,8 @@ app.route({
   method: ["GET", "PUT"],
   url: "/bff/*",
   handler: async (request, reply) => {
-    const target = new URL(request.url.replace(/^\/bff/, ""), APP_BFF_URL);
-    const headers: Record<string, string> = { Authorization: `Bearer ${USER_PRINCIPAL}` };
+    const target = new URL(request.url.replace(/^\/bff/, ""), config.APP_BFF_URL);
+    const headers: Record<string, string> = { Authorization: `Bearer ${config.DEMO_USER_PRINCIPAL}` };
     for (const name of ["content-type", "if-match"]) {
       const value = request.headers[name];
       if (typeof value === "string") headers[name] = value;
@@ -108,9 +124,9 @@ app.post<{ Body: { cardId?: unknown; amount?: unknown; currency?: unknown; merch
     if (typeof cardId !== "string" || !Number.isInteger(amount) || typeof currency !== "string") {
       return reply.code(400).send({ error: "POST /purchases with { cardId, amount (minor units), currency, merchantName? }" });
     }
-    const response = await fetch(`${CARD_API_URL}/cards/${encodeURIComponent(cardId)}/transactions`, {
+    const response = await fetch(`${config.CARD_API_URL}/cards/${encodeURIComponent(cardId)}/transactions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${PROCESSOR_PRINCIPAL}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${config.DEMO_PROCESSOR_PRINCIPAL}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: { amount, currency },
         merchantName: typeof merchantName === "string" && merchantName ? merchantName : "Demo purchase",
@@ -121,4 +137,4 @@ app.post<{ Body: { cardId?: unknown; amount?: unknown; currency?: unknown; merch
   },
 );
 
-await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 3100) });
+await app.listen({ host: "0.0.0.0", port: config.PORT });

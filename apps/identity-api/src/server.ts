@@ -1,16 +1,21 @@
-import { createDatabase, parsePrincipals } from "@qred/service-kit";
+import { createDatabase, parsePrincipals, type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
+import envSchema from "env-schema";
 import { buildApp } from "./app.js";
 import type { DB } from "./db/types.js";
 
-const port = Number(process.env.PORT ?? 3001);
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+const config = envSchema<ServiceEnv & { DATABASE_URL: string }>({
+  schema: {
+    type: "object",
+    required: [...serviceEnvRequired, "DATABASE_URL"],
+    properties: { ...serviceEnv, DATABASE_URL: { type: "string" } },
+  },
+});
 
 const app = await buildApp({
-  db: createDatabase<DB>(databaseUrl),
-  principals: parsePrincipals(process.env.AUTH_PRINCIPALS),
-  ...(process.env.CONTRACT_PATH ? { contractPath: process.env.CONTRACT_PATH } : {}),
+  db: createDatabase<DB>(config.DATABASE_URL),
+  principals: parsePrincipals(config.AUTH_PRINCIPALS),
+  ...(config.CONTRACT_PATH ? { contractPath: config.CONTRACT_PATH } : {}),
   logger: true,
 });
 
-await app.listen({ host: "0.0.0.0", port });
+await app.listen({ host: "0.0.0.0", port: config.PORT });

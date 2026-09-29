@@ -30,8 +30,3 @@ export async function registerBearerAuth(app: FastifyInstance, principals: Princ
     },
   });
 }
-
-export function parsePrincipals(json: string | undefined): Principals {
-  if (!json) throw new Error("AUTH_PRINCIPALS is not set");
-  return JSON.parse(json) as Principals;
-}
