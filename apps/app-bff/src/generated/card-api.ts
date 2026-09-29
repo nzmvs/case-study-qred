@@ -246,6 +246,7 @@ export interface components {
             amount: components["schemas"]["Money"] & {
                 amount?: number;
             };
+            /** @description Printable text; control characters are rejected. */
             merchantName: string;
             /** Format: date-time */
             occurredAt: string;
@@ -408,7 +409,7 @@ export interface components {
         CardId: components["schemas"]["Id"];
         /**
          * @description The Card's current `ETag`. The server answers `428` when it is
-         *     missing; the contract mock answers `400` instead.
+         *     missing; the contract mock answers `422` instead.
          */
         IfMatch: string;
     };
@@ -486,7 +487,7 @@ export interface operations {
             header: {
                 /**
                  * @description The Card's current `ETag`. The server answers `428` when it is
-                 *     missing; the contract mock answers `400` instead.
+                 *     missing; the contract mock answers `422` instead.
                  */
                 "If-Match": components["parameters"]["IfMatch"];
             };

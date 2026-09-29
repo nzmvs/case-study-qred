@@ -57,5 +57,5 @@ These are deliberate and visible in the running system.
 ## Tooling observations
 
 - The official `stoplight/prism` image crashes on startup, so the mocks run the Prism npm package (`infra/prism`).
-- The Prism mock answers a missing `If-Match` with `400`; the real services answer `428` as the contracts say.
+- The Prism mocks answer a missing `If-Match` with a generic validation error (`400` for the App BFF, `422` for the Card API); the real services answer `428` as the contracts say.
 - Redocly reports the Card API's `PUT` example as not matching the `closedReason` `if`/`else` rule. Ajv, which validates at runtime, accepts it.

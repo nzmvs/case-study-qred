@@ -214,7 +214,7 @@ components:
       required: true
       description: |
         The Card's current `ETag`. The server answers `428` when it is
-        missing; the contract mock answers `400` instead.
+        missing; the contract mock answers `422` instead.
       schema: { type: string }
 
   headers:
