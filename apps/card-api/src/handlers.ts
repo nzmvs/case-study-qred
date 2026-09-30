@@ -8,7 +8,7 @@ import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-li
 import { spendPeriodOf } from "./domain/spend-period.js";
 import { TransactionStatus } from "./domain/transaction-status.js";
 import type { components, operations } from "./generated/card-api.js";
-import { type Clock, httpErrors, type Principal } from "@qred/service-kit";
+import { httpErrors, type Principal } from "@qred/service-kit";
 import { cardNotActive, cardNotFound, staleCard } from "./problems.js";
 
 type Op = keyof operations;
@@ -62,7 +62,7 @@ async function spentBetween(db: Database | DbTransaction<DB>, cardId: string, fr
   return spent;
 }
 
-export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
+export function cardHandlers({ db }: { db: Database }) {
   async function findVisible(cardId: string, principal: Principal): Promise<CardRow> {
     const row = await db.selectFrom("cards").selectAll().where("id", "=", cardId).executeTakeFirst();
     if (!row || !visibleTo(row, principal)) throw cardNotFound();
@@ -82,14 +82,14 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
         .where("holderUserId", "=", principal.userId)
         .orderBy("createdAt", "desc")
         .execute();
-      const now = clock();
+      const now = new Date();
       // Filter after mapping: expired is derived, so the stored status cannot be filtered in SQL.
       const cards = rows.map((row) => toCard(row, now));
       return { items: status ? cards.filter((card) => status.includes(card.state.status)) : cards };
     },
 
     async getCard(request: FastifyRequest<{ Params: Path<"getCard"> }>, reply: FastifyReply) {
-      const card = toCard(await findVisible(request.params.cardId, request.principal), clock());
+      const card = toCard(await findVisible(request.params.cardId, request.principal), new Date());
       reply.header("ETag", etagOf(card));
       return card;
     },
@@ -103,7 +103,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
         const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
         if (!row || !visibleTo(row, request.principal)) throw cardNotFound();
 
-        const now = clock();
+        const now = new Date();
         const current = toCard(row, now);
         // `*` is refused on purpose: it would skip the ETag check that stops lost updates (ADR 0002).
         if (request.headers["if-match"] !== etagOf(current)) throw staleCard();
@@ -199,7 +199,7 @@ export function cardHandlers({ db, clock }: { db: Database; clock: Clock }) {
         const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
         if (!row) throw cardNotFound();
 
-        const status = effectiveStatus(row.status as CardStatus, row.expiresAt, clock());
+        const status = effectiveStatus(row.status as CardStatus, row.expiresAt, new Date());
         if (status !== CardStatus.Active) throw cardNotActive(status);
         if (amount.amount <= 0) throw httpErrors.unprocessableEntity("amount must be positive.");
         if (amount.currency !== row.currency) throw httpErrors.unprocessableEntity(`The Card spends in ${row.currency}, not ${amount.currency}.`);

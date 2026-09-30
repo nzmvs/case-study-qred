@@ -1,4 +1,4 @@
-import { type Clock, httpErrors } from "@qred/service-kit";
+import { httpErrors } from "@qred/service-kit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { operations } from "./generated/app-bff.js";
 import { assembleCardOverview, type CardOverviewScreen, currentSpendPeriod } from "./screen.js";
@@ -19,7 +19,7 @@ function userIdOf(request: FastifyRequest): string {
   return request.principal.userId;
 }
 
-export function bffHandlers({ routing, clock, timeoutMs }: { routing: Routing; clock: Clock; timeoutMs: number }) {
+export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutMs: number }) {
   function routeFor(request: FastifyRequest, reply: FastifyReply): Upstreams {
     const { upstreams, sources } = route(routing, userIdOf(request));
     if (routing.mock) reply.header("Qred-Data-Sources", describeSources(sources));
@@ -55,7 +55,7 @@ export function bffHandlers({ routing, clock, timeoutMs }: { routing: Routing; c
       }),
     );
     const cardId = found.items[0]?.id;
-    const period = currentSpendPeriod(clock());
+    const period = currentSpendPeriod(new Date());
 
     if (!cardId) {
       return assembleCardOverview({ me, selectedCompanyId, card: null, spend: null, transactions: null, invoices: await invoices, period });

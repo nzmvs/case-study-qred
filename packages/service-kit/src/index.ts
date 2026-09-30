@@ -4,4 +4,3 @@ export { createDatabase } from "./database.js";
 export { HttpError, httpErrors } from "@fastify/sensible";
 export { type ErrorMapper, type ProblemFields, problemHandler } from "./problems.js";
 export { buildService } from "./service.js";
-export type { Clock } from "./clock.js";
