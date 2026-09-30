@@ -7,15 +7,15 @@
     "node": ">=24"
   },
   "scripts": {
-    "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "typecheck": "turbo run typecheck",
+    "build": "turbo run build",
+    "test": "turbo run test",
     "compose": "docker compose -f infra/docker-compose.yml",
     "dev": "pnpm compose up --build --watch",
     "down": "pnpm compose --profile mock down",
     "logs": "pnpm compose logs --follow",
     "db:reset": "for s in identity-api card-api billing-api; do pnpm compose exec -T $s pnpm --filter @qred/$s db:seed; done",
-    "gen": "pnpm -r gen:api",
+    "gen": "turbo run gen:api",
     "lint:contracts": "pnpm --package=@redocly/cli dlx redocly lint contracts/*.yaml",
     "test:contract": "python3 scripts/contract_tests.py",
     "test:smoke": "python3 scripts/smoke.py",
@@ -24,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^24.19.0",
     "tsx": "^4.23.15",
+    "turbo": "^2.11.5",
     "typescript": "~5.9.3"
   }
 }

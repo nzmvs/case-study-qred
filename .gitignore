@@ -2,3 +2,4 @@ case.pdf
 node_modules/
 dist/
 .env
+.turbo/
