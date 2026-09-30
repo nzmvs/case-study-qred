@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qred Card</title>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --paper: #ffffff;
+    --ink: #13292c;
+    --muted: #5d6c6d;
+    --line: #d8dbd5;
+    --accent: #0e4a4d;
+    --accent-2: #2a8a7e;
+    --accent-soft: #e2efec;
+    --warn: #b0541e;
+    --warn-soft: #f6e6db;
+    --code-bg: #10262a;
+    --code-ink: #e3ecea;
+    --code-muted: #86a19d;
+    --code-key: #8fd3c4;
+    --code-str: #f0c987;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: #0b1b1d; color: var(--ink); font-family: var(--sans); overflow: hidden; }
+
+  .deck { position: absolute; top: 50%; left: 50%; width: 1280px; height: 720px; transform-origin: center; }
+
+  .slide {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    background: var(--bg); padding: 56px 72px 48px; overflow: hidden;
+  }
+  .slide.active { display: flex; }
+  .slide::after {
+    content: attr(data-n); position: absolute; right: 32px; bottom: 22px;
+    font: 500 14px var(--mono); color: var(--muted);
+  }
+  .slide[data-part]::before {
+    content: attr(data-part); position: absolute; left: 72px; bottom: 22px;
+    font: 600 12px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--accent-2);
+  }
+
+  h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
+  h1 { font-size: 64px; line-height: 1.05; font-weight: 750; color: var(--accent); }
+  h2 { font-size: 40px; line-height: 1.12; font-weight: 700; color: var(--accent); margin-bottom: 28px; }
+  h3 { font-size: 22px; font-weight: 650; margin-bottom: 10px; }
+  p, li { font-size: 22px; line-height: 1.45; }
+  p { margin: 0 0 14px; }
+  ul { margin: 0; padding-left: 26px; }
+  li { margin: 0 0 10px; }
+  li::marker { color: var(--accent-2); }
+  small, .muted { color: var(--muted); }
+  strong { color: var(--accent); }
+  code { font-family: var(--mono); font-size: .88em; background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; }
+
+  .lede { font-size: 26px; color: var(--muted); max-width: 980px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 24px 26px;
+  }
+  .card p, .card li { font-size: 19px; }
+  .card h3 { color: var(--accent); }
+  .tag {
+    display: inline-block; font: 600 12px var(--sans); letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 4px; vertical-align: middle; margin-left: 6px;
+  }
+  .tag.have { background: var(--accent-soft); color: var(--accent); }
+  .tag.next { background: var(--warn-soft); color: var(--warn); }
+
+  pre {
+    margin: 0; background: var(--code-bg); color: var(--code-ink); border-radius: 12px;
+    padding: 22px 26px; font: 17px/1.55 var(--mono); overflow: hidden; white-space: pre;
+  }
+  pre .c { color: var(--code-muted); }
+  pre .k { color: var(--code-key); }
+  pre .s { color: var(--code-str); }
+  pre .b {
+    display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center;
+    border-radius: 11px; background: var(--accent-2); color: #fff; font: 700 13px var(--sans); margin-right: 6px;
+  }
+
+  table { border-collapse: collapse; width: 100%; font-size: 19px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  svg { display: block; font-family: var(--sans); }
+  svg text { fill: var(--ink); }
+  svg .box { fill: var(--paper); stroke: var(--line); stroke-width: 1.5; }
+  svg .box-accent { fill: var(--accent); stroke: none; }
+  svg .box-soft { fill: var(--accent-soft); stroke: var(--accent-2); stroke-width: 1.5; }
+  svg .box-warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.5; }
+  svg .dash { stroke-dasharray: 6 5; }
+  svg .edge { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+  svg .edge-accent { stroke: var(--accent-2); stroke-width: 2.4; fill: none; }
+  svg .on-dark { fill: #fff; }
+  svg .lbl { font-size: 15px; fill: var(--muted); }
+
+  /* Title and section slides */
+  .slide.title { justify-content: center; background: var(--accent); }
+  .slide.title h1 { color: #fff; font-size: 72px; max-width: 1000px; }
+  .slide.title .lede { color: #bcd8d3; margin-top: 24px; }
+  .slide.title .who { margin-top: 56px; color: #fff; font-size: 20px; }
+  .slide.title .who span { color: #9cc5be; }
+  .slide.title::after { color: #9cc5be; }
+  .slide.section { justify-content: center; }
+  .slide.section .kicker { margin-bottom: 16px; }
+
+  /* Wireframe on the payload slide */
+  .phone {
+    width: 290px; background: var(--paper); border: 8px solid #2b3a3c; border-radius: 26px;
+    padding: 12px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px;
+  }
+  .phone .row { background: #e7e9e5; border-radius: 6px; padding: 6px 10px; position: relative; display: flex; justify-content: space-between; }
+  .phone .cardimg { height: 62px; border-radius: 12px; align-items: center; justify-content: center; }
+  .phone .spend { flex-direction: column; gap: 4px; }
+  .phone .spend b { font-size: 15px; text-align: center; }
+  .phone .tx { background: #d6d9d4; }
+  .phone .more { background: var(--paper); border: 1px solid #2b3a3c; justify-content: center; }
+  .phone .btn { background: #20292b; color: #fff; justify-content: center; }
+  .phone .static { opacity: .55; }
+  .phone .pin {
+    position: absolute; left: -30px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px;
+    background: var(--accent-2); color: #fff; font: 700 13px var(--sans);
+  }
+
+  .kicker { font: 600 16px var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); margin: 0 0 8px; }
+  .label { font: 700 13px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .ask { border-left: 4px solid var(--accent-2); padding: 2px 0 2px 16px; color: var(--muted); font-size: 19px; font-style: italic; margin: 0 0 22px; }
+  ul.tight li { font-size: 20px; margin-bottom: 8px; }
+  .evidence {
+    margin: auto 0 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 18px; font-size: 18px;
+  }
+  .evidence .tag { margin: 0 10px 0 0; }
+  table.principles td { font-size: 22px; padding: 16px 14px; }
+  table.principles td.num { font: 700 26px var(--sans); color: var(--accent-2); }
+  .phone-map { display: flex; gap: 40px; align-items: center; padding-left: 26px; }
+  ol.keys { list-style: none; counter-reset: k; margin: 0; padding: 0; }
+  ol.keys li { counter-increment: k; font-size: 17px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  ol.keys li::before {
+    content: counter(k); width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px;
+    background: var(--accent-2); color: #fff; font: 700 13px var(--sans); flex: none;
+  }
+  ol.steps { margin: 6px 0 0; padding-left: 26px; }
+  ol.steps li { font-size: 20px; margin-bottom: 10px; }
+  ol.steps li::marker { color: var(--accent-2); font-weight: 700; }
+
+  .progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--accent-2); transition: width .2s; z-index: 5; }
+
+  .notes { display: none; }
+  .notes-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; max-height: 34vh; overflow: auto; z-index: 10;
+    background: rgba(8, 20, 22, .96); color: #e3ecea; font: 17px/1.5 var(--sans); padding: 16px 28px 22px;
+    display: none;
+  }
+  .notes-panel.open { display: block; }
+  .notes-panel b { color: var(--code-key); font-weight: 600; }
+
+  @media print {
+    @page { size: 1280px 720px; margin: 0; }
+    body { background: none; overflow: visible; }
+    .deck { position: static; transform: none !important; width: auto; height: auto; }
+    .slide { position: relative; display: flex !important; width: 1280px; height: 720px; break-after: page; }
+    .progress, .notes-panel { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- ============================================================ -->
+<section class="slide title">
+  <h1>Frontend and backend, in parallel</h1>
+  <p class="lede">Principles for how Qred builds APIs, and the decisions they led to in the card overview Screen.</p>
+  <p class="who">Nazim Huseynov <span>&middot; Node.js Backend Developer case</span></p>
+  <aside class="notes">
+    The talk is Task 1: how to fix the collaboration problems. Task 2, the implementation, shows up as evidence that each principle works in practice. Implementation details are in an appendix for questions.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="The problem">
+  <h2>Three root causes behind the symptoms</h2>
+  <div class="grid-3">
+    <div class="card">
+      <h3>The API is defined late</h3>
+      <p>It takes shape while the backend is being built, so the frontend learns the real shape at integration.</p>
+      <p class="muted">"API definition and implementation sometimes occur too late."</p>
+    </div>
+    <div class="card">
+      <h3>Expertise is a bottleneck</h3>
+      <p>Few people can specify an API well. PMs cannot, and less experienced developers need the details spelled out.</p>
+      <p class="muted">"Technical competence to specify &hellip; is a scarce resource."</p>
+    </div>
+    <div class="card">
+      <h3>Frontend waits on backend</h3>
+      <p>Competent frontend developers sit idle or build against guesses until a real endpoint exists.</p>
+      <p class="muted">"Frustrated by delays in API availability."</p>
+    </div>
+  </div>
+  <p style="margin-top: 36px;">Fix the first and the other two get cheaper: <strong>agree the API before anyone builds it</strong>, then let tooling carry the expertise.</p>
+  <aside class="notes">
+    The case lists seven bullets; they collapse into these three. The order matters: a late definition is what makes expertise scarce (every API is a bespoke negotiation) and what blocks frontend.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="The idea">
+  <h2>Move the contract to the start of the work</h2>
+  <svg viewBox="0 0 1136 360" width="1136" height="360" role="img" aria-label="Sequential delivery compared with contract-first delivery">
+    <text x="0" y="22" font-size="16" font-weight="700" fill="#5d6c6d" letter-spacing="1.5">TODAY</text>
+    <rect class="box" x="0" y="38" width="190" height="56" rx="8"/><text x="95" y="72" text-anchor="middle" font-size="17">Design</text>
+    <rect class="box" x="204" y="38" width="380" height="56" rx="8"/><text x="394" y="72" text-anchor="middle" font-size="17">Backend defines and builds the API</text>
+    <rect class="box" x="598" y="38" width="300" height="56" rx="8"/><text x="748" y="72" text-anchor="middle" font-size="17">Frontend integrates, rework</text>
+    <rect class="box-accent" x="912" y="38" width="170" height="56" rx="8"/><text x="997" y="72" text-anchor="middle" font-size="17" class="on-dark">Ship</text>
+    <path class="edge" d="M204 108 h380" stroke="#b0541e"/><path class="edge" d="M204 102 v12 M584 102 v12" stroke="#b0541e"/>
+    <text x="394" y="132" text-anchor="middle" class="lbl" style="fill:#b0541e">frontend waits</text>
+
+    <text x="0" y="186" font-size="16" font-weight="700" fill="#0e4a4d" letter-spacing="1.5">CONTRACT FIRST</text>
+    <rect class="box" x="0" y="232" width="190" height="56" rx="8"/><text x="95" y="266" text-anchor="middle" font-size="17">Design</text>
+    <rect class="box-soft" x="204" y="232" width="200" height="56" rx="8"/><text x="304" y="258" text-anchor="middle" font-size="17" font-weight="650">Contract</text><text x="304" y="278" text-anchor="middle" class="lbl">PM + FE + BE</text>
+    <rect class="box" x="418" y="200" width="300" height="52" rx="8"/><text x="568" y="232" text-anchor="middle" font-size="17">Frontend builds on the mock</text>
+    <rect class="box" x="418" y="268" width="300" height="52" rx="8"/><text x="568" y="300" text-anchor="middle" font-size="17">Backend implements the contract</text>
+    <rect class="box-soft" x="732" y="232" width="150" height="56" rx="8"/><text x="807" y="266" text-anchor="middle" font-size="17">Flip the flag</text>
+    <rect class="box-accent" x="896" y="232" width="120" height="56" rx="8"/><text x="956" y="266" text-anchor="middle" font-size="17" class="on-dark">Ship</text>
+    <path class="edge-accent" d="M1016 302 h66 M1016 296 v12 M1082 296 v12"/><text x="1049" y="326" text-anchor="middle" class="lbl" style="fill:#2a8a7e">sooner</text>
+  </svg>
+  <p style="margin-top: 8px;">The contract is an OpenAPI file with <strong>examples taken from the design</strong>. It is reviewed like code and merged before either side builds.</p>
+  <aside class="notes">
+    This is the whole proposal in one picture. The next slides are the principles that make it work, each with the decision it leads to and where the case implementation shows it.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Principles">
+  <h2>Five principles</h2>
+  <table class="principles">
+    <tr><th style="width: 7%;"></th><th style="width: 50%;">Principle</th><th>Answers</th></tr>
+    <tr><td class="num">1</td><td><strong>The contract is the first deliverable</strong></td><td>API definition comes too late</td></tr>
+    <tr><td class="num">2</td><td><strong>Design around Screens, in shared language</strong></td><td>PMs with limited technical knowledge</td></tr>
+    <tr><td class="num">3</td><td><strong>Never block the frontend</strong></td><td>Frontend frustrated by delays</td></tr>
+    <tr><td class="num">4</td><td><strong>Put expertise into tooling, not queues</strong></td><td>Scarce API expertise, less experienced developers</td></tr>
+    <tr><td class="num">5</td><td><strong>Keep each rule in one place</strong></td><td>Frontend and backend in parallel, without drift</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Principles">
+  <p class="kicker">Principle 1</p>
+  <h2>The contract is the first deliverable</h2>
+  <div class="grid-2">
+    <div>
+      <p class="label">The ask</p>
+      <p class="ask">"The API definition and implementation sometimes occur too late in the software development lifecycle."</p>
+      <p class="label">The decision</p>
+      <ul class="tight">
+        <li>An OpenAPI contract with examples is written and merged <strong>before either side builds</strong>.</li>
+        <li>"Contract merged" is part of the Definition of Ready for any story that needs an API.</li>
+        <li>Everything else is derived from it, so it can't drift from the code.</li>
+      </ul>
+    </div>
+    <svg viewBox="0 0 560 380" width="540" height="366" role="img" aria-label="The contract feeds routes, types, mocks, tests, lint and review">
+      <g font-size="14" text-anchor="middle">
+        <rect class="box" x="0" y="20" width="160" height="50" rx="8"/><text x="80" y="50">Mock server</text>
+        <rect class="box" x="400" y="20" width="160" height="50" rx="8"/><text x="480" y="50">TypeScript types</text>
+        <rect class="box" x="0" y="165" width="160" height="50" rx="8"/><text x="80" y="195">Routes + validation</text>
+        <rect class="box" x="400" y="165" width="160" height="50" rx="8"/><text x="480" y="195">Contract tests</text>
+        <rect class="box" x="0" y="310" width="160" height="50" rx="8"/><text x="80" y="340">Lint, breaking changes</text>
+        <rect class="box" x="400" y="310" width="160" height="50" rx="8"/><text x="480" y="340">Review on a PR</text>
+      </g>
+      <path class="edge-accent" d="M190 170 L160 70 M370 170 L400 70 M190 190 H160 M370 190 H400 M190 210 L160 310 M370 210 L400 310"/>
+      <rect class="box-accent" x="190" y="150" width="180" height="80" rx="10"/>
+      <text x="280" y="186" text-anchor="middle" font-size="18" font-weight="650" class="on-dark">OpenAPI contract</text>
+      <text x="280" y="208" text-anchor="middle" font-size="13" style="fill:#bcd8d3">with examples</text>
+    </svg>
+  </div>
+  <p class="evidence"><span class="tag have">In the case</span> Each of the four services has a contract in <code>contracts/</code>, and its routes and request validation are built from that file.</p>
+  <aside class="notes">
+    One source of truth, many outputs. If the contract is the thing you merge first, everything downstream (mocks, types, tests) exists from day one and cannot silently diverge.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Principles">
+  <p class="kicker">Principle 2</p>
+  <h2>Design around Screens, in shared language</h2>
+  <div class="grid-2" style="grid-template-columns: 1.25fr 1fr;">
+    <div>
+      <p class="label">The ask</p>
+      <p class="ask">"Product Managers only have limited technical knowledge and require assistance in describing the technical implementation details."</p>
+      <p class="label">The decision</p>
+      <ul class="tight">
+        <li>The PM writes a <strong>Screen brief</strong>: its sections, the data and states of each, and the actions on it.</li>
+        <li>One endpoint per Screen, with <strong>examples that read like the wireframe</strong>, so a PM can check them.</li>
+        <li>A glossary fixes the words, so PM, frontend and backend mean the same thing.</li>
+      </ul>
+    </div>
+    <div class="phone-map">
+      <div class="phone" style="zoom: .92;">
+        <div class="row"><span class="pin">1</span><span>Company AB</span><span>&#8964;</span></div>
+        <div class="row" style="justify-content:center;"><span class="pin">2</span>Invoice due &rsaquo;</div>
+        <div class="row cardimg"><span class="pin">3</span>Card image</div>
+        <div class="row spend"><span class="pin">4</span><span>Remaining spend</span><b>5 400/10 000 kr</b></div>
+        <div class="row tx" style="font-weight:600"><span class="pin">5</span>Latest transactions</div>
+        <div class="row tx"><span>Transaction data</span><span>Data points</span></div>
+        <div class="row more">54 more items &rsaquo;</div>
+        <div class="row btn"><span class="pin">6</span>Activate card</div>
+      </div>
+      <ol class="keys">
+        <li><code>companySwitcher</code></li>
+        <li><code>invoiceDue</code></li>
+        <li><code>card</code></li>
+        <li><code>spend</code></li>
+        <li><code>latestTransactions</code></li>
+        <li><code>card.actions</code></li>
+      </ol>
+    </div>
+  </div>
+  <p class="evidence"><span class="tag have">In the case</span> <code>GET /screens/card-overview</code> returns the whole view in one call, and <code>CONTEXT.md</code> is the glossary.</p>
+  <aside class="notes">
+    PMs can't write OpenAPI, but they can read an example and check it against the wireframe: "5 400/10 000 kr" is remaining and spendingLimit. Named examples (active Card, inactive Card) double as the list of states the Screen must handle, which is what less experienced developers need spelled out.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Principles">
+  <p class="kicker">Principle 3</p>
+  <h2>Never block the frontend</h2>
+  <div class="grid-2" style="grid-template-columns: 1fr 1fr;">
+    <div>
+      <p class="label">The ask</p>
+      <p class="ask">"The Frontend Developers are competent and can be frustrated by delays in API availability."</p>
+      <p class="label">The decision</p>
+      <ul class="tight">
+        <li>A mock generated from the contract is running <strong>the day the contract merges</strong>.</li>
+        <li>The app always calls the real BFF, which switches each upstream from mock to real behind a flag. No app release is needed.</li>
+        <li>Fail safe: an unknown flag means real, and production never allows mocks.</li>
+      </ul>
+    </div>
+    <svg viewBox="0 0 560 380" width="540" height="366" role="img" aria-label="App BFF routes each upstream to its mock or real service">
+      <rect class="box" x="0" y="160" width="130" height="64" rx="8"/><text x="65" y="198" text-anchor="middle" font-size="17">Mobile app</text>
+      <path class="edge" d="M130 192 h50"/>
+      <rect class="box-accent" x="180" y="140" width="130" height="104" rx="8"/>
+      <text x="245" y="186" text-anchor="middle" font-size="17" class="on-dark" font-weight="650">App BFF</text>
+      <text x="245" y="208" text-anchor="middle" font-size="13" style="fill:#bcd8d3">one URL, always</text>
+      <rect class="box-warn dash" x="190" y="300" width="110" height="44" rx="8"/><text x="245" y="327" text-anchor="middle" font-size="15">Flags</text>
+      <path class="edge dash" d="M245 300 v-56"/>
+      <text x="400" y="30" text-anchor="middle" class="lbl">mock</text>
+      <text x="505" y="30" text-anchor="middle" class="lbl">real</text>
+      <text x="330" y="84" font-size="15">identity</text>
+      <rect class="box" x="360" y="96" width="80" height="34" rx="6"/><rect class="box-soft" x="465" y="96" width="80" height="34" rx="6"/>
+      <path class="edge-accent" d="M310 170 C 400 170, 430 113, 465 113"/>
+      <text x="330" y="184" font-size="15">card</text>
+      <rect class="box-soft" x="360" y="196" width="80" height="34" rx="6"/><rect class="box" x="465" y="196" width="80" height="34" rx="6"/>
+      <path class="edge-accent" d="M310 200 C 330 200, 340 213, 360 213"/>
+      <text x="330" y="284" font-size="15">billing</text>
+      <rect class="box" x="360" y="296" width="80" height="34" rx="6"/><rect class="box-soft" x="465" y="296" width="80" height="34" rx="6"/>
+      <path class="edge-accent" d="M310 230 C 400 230, 430 313, 465 313"/>
+    </svg>
+  </div>
+  <p class="evidence"><span class="tag have">In the case</span> A mock per contract, a flag per upstream, and a <code>Qred-Data-Sources</code> header naming what served each response.</p>
+  <aside class="notes">
+    ADR 0004. Mobile releases are slow, so switching belongs on the server. Switching per upstream rather than per Screen means a half-built backend is still useful: Card can be real while Billing is still a mock. Real data can roll out to testers before everyone.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Principles">
+  <p class="kicker">Principle 4</p>
+  <h2>Put expertise into tooling, not queues</h2>
+  <div class="grid-2" style="grid-template-columns: 1.1fr 1fr;">
+    <div>
+      <p class="label">The ask</p>
+      <p class="ask">"The technical competence to specify and support the building of these APIs is currently a scarce resource."</p>
+      <p class="label">The decision</p>
+      <ul class="tight">
+        <li>A <strong>paved road</strong>: a shared service kit gives every service the same pipeline, errors and config.</li>
+        <li>Types, validation and contract tests come from the contract, so mistakes fail in CI instead of waiting for a senior's review.</li>
+        <li>Seniors review contracts and improve the road instead of writing every API.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Adding an endpoint</h3>
+      <ol class="steps">
+        <li>Write it in the contract</li>
+        <li>Generate the types</li>
+        <li>Add a handler named after the operation</li>
+        <li>Run the contract tests</li>
+      </ol>
+      <p class="muted" style="margin-top: 14px;">Four steps a less experienced developer can follow alone.</p>
+    </div>
+  </div>
+  <p class="evidence"><span class="tag have">In the case</span> Every service is built on <code>packages/service-kit</code>, and Schemathesis checks every response against its contract.</p>
+  <aside class="notes">
+    Hiring alone doesn't solve scarce expertise; encoding it does. The expert's judgement goes into the contract conventions, the kit and the checks, and every developer gets it for free. A rotating contract reviewer spreads the skill further.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Principles">
+  <p class="kicker">Principle 5</p>
+  <h2>Keep each rule in one place</h2>
+  <div class="grid-2" style="grid-template-columns: 1fr 1fr;">
+    <div>
+      <p class="label">The ask</p>
+      <p class="ask">"We want frontend and backend work to happen smoothly and in parallel."</p>
+      <p class="label">The decision</p>
+      <ul class="tight">
+        <li>Domain services own the business rules and their data.</li>
+        <li>A BFF only shapes that data into Screens, so a Screen change never touches the domain.</li>
+        <li>The server tells the app what the User may do, so rules are never copied into the app.</li>
+      </ul>
+    </div>
+    <svg viewBox="0 0 540 380" width="540" height="380" role="img" aria-label="Mobile app calls the App BFF, which calls three domain services with their own databases">
+      <rect class="box" x="195" y="0" width="150" height="50" rx="8"/><text x="270" y="31" text-anchor="middle" font-size="16">Mobile app</text>
+      <path class="edge" d="M270 50 V90"/>
+      <rect class="box-accent" x="130" y="90" width="280" height="70" rx="8"/>
+      <text x="270" y="121" text-anchor="middle" font-size="17" class="on-dark" font-weight="650">App BFF</text>
+      <text x="270" y="143" text-anchor="middle" font-size="13" style="fill:#bcd8d3">shapes Screens, holds no rules</text>
+      <path class="edge" d="M200 160 L80 220 M270 160 V220 M340 160 L460 220"/>
+      <g text-anchor="middle">
+        <rect class="box" x="0" y="220" width="160" height="60" rx="8"/><text x="80" y="256" font-size="16" font-weight="650">Identity</text>
+        <rect class="box" x="190" y="220" width="160" height="60" rx="8"/><text x="270" y="256" font-size="16" font-weight="650">Card</text>
+        <rect class="box" x="380" y="220" width="160" height="60" rx="8"/><text x="460" y="256" font-size="16" font-weight="650">Billing</text>
+        <path class="edge" d="M80 280 V300 M270 280 V300 M460 280 V300"/>
+        <rect class="box-soft" x="20" y="300" width="120" height="36" rx="18"/><text x="80" y="323" font-size="13">own database</text>
+        <rect class="box-soft" x="210" y="300" width="120" height="36" rx="18"/><text x="270" y="323" font-size="13">own database</text>
+        <rect class="box-soft" x="400" y="300" width="120" height="36" rx="18"/><text x="460" y="323" font-size="13">own database</text>
+        <text x="270" y="368" class="lbl">each owns its rules and has its own contract</text>
+      </g>
+    </svg>
+  </div>
+  <p class="evidence"><span class="tag have">In the case</span> A BFF over Identity, Card and Billing (ADR 0001); <code>actions</code> decides if "Activate card" shows.</p>
+  <aside class="notes">
+    Separate contracts per service mean separate streams of work. The cost is more network hops and more contracts; the gain is that Screen changes, which are frequent, never touch domain code, and domain changes never break the app's shape.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Rollout">
+  <h2>Rolling it out at Qred</h2>
+  <div class="grid-2" style="grid-template-columns: 1.2fr 1fr;">
+    <table>
+      <tr><th style="width: 30%;">When</th><th>What</th></tr>
+      <tr><td>First sprint</td><td>Pilot on one Screen (this one). Write the Screen brief template and the recipe.</td></tr>
+      <tr><td>First month</td><td>Contract lint, contract tests and the breaking-change check in CI. The service kit is shared.</td></tr>
+      <tr><td>First quarter</td><td>Every new API starts from a merged contract. Contract review happens in refinement. The flags are cleaned up once each service is live.</td></tr>
+    </table>
+    <div class="card">
+      <h3>How we know it works</h3>
+      <ul>
+        <li>Days from the approved design to an API frontend can use: the target is the same week</li>
+        <li>Frontend days blocked on backend</li>
+        <li>Breaking changes caught in CI rather than found in the app</li>
+        <li>Share of APIs specified by someone other than a senior</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Start small with one team and one Screen, measure, then widen. Senior management backing (the case grants it) is needed mostly for the Definition of Ready change, because it changes how refinement runs.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Values">
+  <h2>How it fits Qred's values</h2>
+  <div class="grid-3">
+    <div class="card">
+      <h3>Transparency</h3>
+      <p>The contract is a public, reviewable promise between teams. Decisions are written as ADRs.</p>
+      <p>The system says what it is doing: which data is mocked, and which part of a Screen failed to load.</p>
+    </div>
+    <div class="card">
+      <h3>Innovation</h3>
+      <p>One file produces the server's routes, validation, types, mocks and tests.</p>
+      <p>Server-side flags move the app from fake to real data without a release.</p>
+    </div>
+    <div class="card">
+      <h3>Passion</h3>
+      <p>Care for the people downstream: frontend is never blocked, PMs get examples they can check, and juniors get a road that works.</p>
+      <p>Care for the customer: the Screen still renders when part of it fails.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="The case">
+  <h2>Each ask, answered in the build</h2>
+  <table>
+    <tr><th style="width: 30%;">The case asks</th><th style="width: 28%;">Principle</th><th>What the card overview build shows</th></tr>
+    <tr><td>Define APIs earlier</td><td>1 &middot; Contract first</td><td>Contracts written before code, and the servers built from them</td></tr>
+    <tr><td>Help PMs describe the work</td><td>2 &middot; Screens, shared language</td><td>One call per Screen, examples that mirror the wireframe, a glossary</td></tr>
+    <tr><td>No waiting on APIs</td><td>3 &middot; Never block frontend</td><td>Mocks from day one, real data switched on per upstream</td></tr>
+    <tr><td>Scale scarce expertise</td><td>4 &middot; Tooling, not queues</td><td>A shared service kit, generated types, contract tests</td></tr>
+    <tr><td>Work in parallel</td><td>5 &middot; Rules in one place</td><td>A BFF over three domain services, with a contract each</td></tr>
+  </table>
+  <aside class="notes">
+    Summary before the demo. Everything in the right column runs locally with one command.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide section" data-part="Demo">
+  <p class="kicker">Live demo</p>
+  <h1 style="font-size: 56px;">From mock to real, without touching the app</h1>
+  <ol style="margin-top: 32px; padding-left: 28px;">
+    <li>A fresh stack serves the Screen entirely from mocks, as frontend would have it on day one.</li>
+    <li>Turn on real data for the Card API. The app is unchanged, and the response says what switched.</li>
+    <li>Activate the Card and spend against its limit, now on real data.</li>
+  </ol>
+  <aside class="notes">
+    pnpm start, harness at localhost:3100, Unleash at :4242 (flag bff-card-api-real). Switch to Nordic Trading AB for the inactive Card. Simulate purchases until Remaining spend runs out, then freeze. Fallback if Docker misbehaves: pnpm compose --profile mock up shows the BFF contract mock alone.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Next">
+  <h2>What comes next</h2>
+  <div class="grid-3">
+    <div class="card">
+      <h3>Guardrails for every team</h3>
+      <p>Breaking-change detection and an owning team per contract in CI, plus consumer tests written by the app team.</p>
+    </div>
+    <div class="card">
+      <h3>The next Screen, same loop</h3>
+      <p>The Transactions view behind "54 more": brief, contract, mock, build, flag.</p>
+    </div>
+    <div class="card">
+      <h3>Production readiness</h3>
+      <p>Real authentication, events between services, and tracing across the BFF and its upstreams.</p>
+    </div>
+  </div>
+  <p style="margin-top: 26px;" class="muted">The full list, with the known simplifications, is in <code>NOTES.md</code>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide title">
+  <h1 style="font-size: 60px;">Agree the contract first. Let the tooling carry it.</h1>
+  <p class="lede">Frontend starts on day one, PMs review examples they can read, less experienced developers follow a paved road, and real data arrives behind a flag.</p>
+  <p class="who">Questions <span>&middot; the appendix has the implementation details</span></p>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide section" data-part="Appendix">
+  <p class="kicker">Appendix</p>
+  <h1>Implementation details</h1>
+  <p class="lede" style="margin-top: 20px;">For questions: architecture, payload, schema, domain rules, card changes, code and checks.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Architecture">
+  <h2>An App BFF over three domain services</h2>
+  <svg viewBox="0 0 1136 380" width="1136" height="380" role="img" aria-label="Architecture: mobile app, App BFF, Identity, Card and Billing APIs, each with its own database">
+    <rect class="box" x="0" y="160" width="150" height="64" rx="8"/><text x="75" y="198" text-anchor="middle" font-size="17">Mobile app</text>
+    <path class="edge" d="M150 192 h96"/><text x="198" y="182" text-anchor="middle" class="lbl">1 call</text>
+
+    <rect class="box-accent" x="246" y="146" width="210" height="92" rx="8"/>
+    <text x="351" y="186" text-anchor="middle" font-size="19" class="on-dark" font-weight="650">App BFF</text>
+    <text x="351" y="210" text-anchor="middle" font-size="14" style="fill:#bcd8d3">:3000 &middot; shapes Screens</text>
+
+    <rect class="box-warn dash" x="266" y="300" width="170" height="48" rx="8"/><text x="351" y="329" text-anchor="middle" font-size="15">Unleash :4242</text>
+    <path class="edge dash" d="M351 300 v-62"/>
+    <rect class="box dash" x="266" y="30" width="170" height="60" rx="8"/><text x="351" y="56" text-anchor="middle" font-size="15">Prism mocks</text><text x="351" y="76" text-anchor="middle" class="lbl">:4001&ndash;4003</text>
+    <path class="edge dash" d="M351 90 v56"/>
+
+    <path class="edge" d="M456 176 C 520 176, 520 75, 580 75"/>
+    <path class="edge" d="M456 192 H 580"/>
+    <path class="edge" d="M456 208 C 520 208, 520 309, 580 309"/>
+
+    <rect class="box" x="580" y="40" width="315" height="70" rx="8"/><text x="600" y="70" font-size="17" font-weight="650">Identity API</text><text x="600" y="92" class="lbl">:3001 &middot; Users, Companies, Memberships</text>
+    <rect class="box" x="580" y="157" width="315" height="70" rx="8"/><text x="600" y="187" font-size="17" font-weight="650">Card API</text><text x="600" y="209" class="lbl">:3002 &middot; Cards, Transactions, spend</text>
+    <rect class="box" x="580" y="274" width="315" height="70" rx="8"/><text x="600" y="304" font-size="17" font-weight="650">Billing API</text><text x="600" y="326" class="lbl">:3003 &middot; Invoices</text>
+
+    <path class="edge" d="M895 75 h25 M895 192 h25 M895 309 h25"/>
+    <g font-size="15">
+      <rect class="box-soft" x="920" y="52" width="170" height="46" rx="23"/><text x="1005" y="80" text-anchor="middle">Postgres: identity</text>
+      <rect class="box-soft" x="920" y="169" width="170" height="46" rx="23"/><text x="1005" y="197" text-anchor="middle">Postgres: card</text>
+      <rect class="box-soft" x="920" y="286" width="170" height="46" rx="23"/><text x="1005" y="314" text-anchor="middle">Postgres: billing</text>
+    </g>
+  </svg>
+  <p style="margin-top: 6px;">The BFF holds <strong>no domain rules</strong>, and the Card API depends on <strong>no other service</strong>. The cost is more hops and more contracts; the gain is Screen changes that never touch the domain, and separate contracts to work on in parallel. <small>(ADR 0001)</small></p>
+  <aside class="notes">
+    Each service owns its data and its database. The Card API is on the busiest path (the Card processor records purchases), so it must not wait on Identity or Billing. The BFF is where use-case concerns live: which Company is selected, how many Transactions to show, which buttons appear.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Payload">
+  <h2>The whole Screen in one payload</h2>
+  <div class="grid-2" style="grid-template-columns: 340px 1fr; gap: 28px; margin-top: -8px;">
+    <div style="padding-left: 34px;">
+      <div class="phone">
+        <div class="row static"><span>Logo</span><span>Menu</span></div>
+        <div class="row"><span class="pin">1</span><span>Company AB</span><span>&#8964;</span></div>
+        <div class="row" style="justify-content:center;"><span class="pin">2</span>Invoice due &rsaquo;</div>
+        <div class="row cardimg"><span class="pin">3</span>Card image</div>
+        <div class="row spend"><span class="pin">4</span><span>Remaining spend</span><b>5 400/10 000 kr</b><small style="text-align:right">based on your set limit</small></div>
+        <div class="row tx" style="font-weight:600"><span class="pin">5</span>Latest transactions</div>
+        <div class="row tx"><span>Transaction data</span><span>Data points</span></div>
+        <div class="row tx"><span>Transaction data</span><span>Data points</span></div>
+        <div class="row tx"><span>Transaction data</span><span>Data points</span></div>
+        <div class="row more">54 more items in transaction view &rsaquo;</div>
+        <div class="row btn"><span class="pin">6</span>Activate card</div>
+        <div class="row btn static">Contact Qred's support</div>
+      </div>
+    </div>
+    <pre style="font-size: 14.5px; line-height: 1.5;"><span class="c">GET /screens/card-overview?companyId=&hellip;</span>
+{
+  <span class="b">1</span><span class="k">"companySwitcher"</span>: { <span class="k">"selectedCompanyId"</span>, <span class="k">"companies"</span>: [{ id, name }] },
+  <span class="b">2</span><span class="k">"invoiceDue"</span>: { id, amount, <span class="k">"dueDate"</span>: <span class="s">"2026-10-15"</span>, <span class="k">"status"</span>: <span class="s">"open"</span> },
+  <span class="b">3</span><span class="k">"card"</span>: { id, <span class="k">"status"</span>: <span class="s">"active"</span>, <span class="k">"last4"</span>: <span class="s">"4821"</span>, <span class="k">"expiry"</span>: <span class="s">"09/29"</span>,
+             holderName, <span class="k">"etag"</span>: <span class="s">"\"c2a9f0\""</span>, <span class="b">6</span><span class="k">"actions"</span>: [<span class="s">"freeze"</span>] },
+  <span class="b">4</span><span class="k">"spend"</span>: {
+    <span class="k">"remaining"</span>:     { <span class="k">"amount"</span>: <span class="s">540000</span>,  <span class="k">"currency"</span>: <span class="s">"SEK"</span> },
+    <span class="k">"spendingLimit"</span>: { <span class="k">"amount"</span>: <span class="s">1000000</span>, <span class="k">"currency"</span>: <span class="s">"SEK"</span> },
+    spent, periodStart, periodEnd },
+  <span class="b">5</span><span class="k">"latestTransactions"</span>: {
+    <span class="k">"items"</span>: [{ merchantName, amount, occurredAt, status }], <span class="c">// max 3</span>
+    <span class="k">"totalCount"</span>: <span class="s">57</span>, <span class="k">"moreCount"</span>: <span class="s">54</span> },
+  <span class="k">"unavailable"</span>: []
+}</pre>
+  </div>
+  <aside class="notes">
+    Every numbered box on the wireframe maps to one key. Logo, Menu and Contact support are static client content, so they're not in the payload. Without companyId the first Company is selected, so the first launch is a single call.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Payload">
+  <h2>Payload decisions, made for the app</h2>
+  <div class="grid-2">
+    <ul>
+      <li><strong>One round trip.</strong> The BFF calls the services in parallel on a fast network, so the phone makes one call on a slow one.</li>
+      <li><strong>Money as integer minor units plus currency.</strong> No floats, and formatting stays on the client.</li>
+      <li><strong>The server decides the buttons.</strong> <code>actions</code> lists what the User can do now, so lifecycle rules are never copied into the app.</li>
+      <li><strong>Counts come ready.</strong> <code>moreCount</code> is "54 more", and <code>remaining</code> is never below zero.</li>
+    </ul>
+    <ul>
+      <li><strong>Partial failure is explicit.</strong> If spend, transactions or the invoice fail, that section is <code>null</code> and listed in <code>unavailable</code>. The app shows it as loading, never as empty.</li>
+      <li><strong>Only the essentials are required.</strong> If the Company list or the Card is missing, the answer is <code>502</code>.</li>
+      <li><strong>Writes return the Screen.</strong> <code>PUT /cards/{id}</code> answers with the refreshed Screen, so there's no second call.</li>
+      <li><strong>No card numbers.</strong> Only <code>last4</code>. A full PAN belongs in the processor's secure view.</li>
+    </ul>
+  </div>
+  <aside class="notes">
+    The distinction between null-because-none and null-because-unavailable matters on a finance screen: "no invoice due" and "we couldn't check your invoices" must never look the same.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Database">
+  <h2>Database: one per service, rules in the schema</h2>
+  <div class="grid-2" style="grid-template-columns: 1.15fr 1fr;">
+    <pre style="font-size: 14px; line-height: 1.5;"><span class="c">-- card database</span>
+<span class="k">cards</span>(id, company_id, holder_user_id, last4,
+      expiry_month, expiry_year, expires_at,
+      currency, spending_limit <span class="k">bigint</span>,
+      status <span class="c">-- inactive | active | frozen | closed</span>
+      closed_reason, created_at, updated_at)
+  <span class="k">CHECK</span> ((status = <span class="s">'closed'</span>) = (closed_reason <span class="k">IS NOT NULL</span>))
+  <span class="k">UNIQUE</span> (company_id, holder_user_id)
+    <span class="k">WHERE</span> status &lt;&gt; <span class="s">'closed'</span>      <span class="c">-- one open Card</span>
+
+<span class="k">transactions</span>(id, card_id, amount <span class="k">bigint</span>, currency,
+             merchant_name, occurred_at, status)
+  <span class="k">INDEX</span> (card_id, occurred_at, id)
+    <span class="k">INCLUDE</span> (amount, status)
+
+<span class="c">-- identity</span>  users, companies,
+            memberships(user_id, company_id)
+<span class="c">-- billing</span>   invoices(company_id, amount,
+            due_date, due_at, status)</pre>
+    <ul>
+      <li><strong>Integrity lives in Postgres:</strong> CHECK constraints on status, amounts and <code>last4</code>, and a partial unique index for "at most one open Card".</li>
+      <li><strong>One index, two queries.</strong> The spend sum per card and month is an index-only scan, and newest-first paging uses the same index.</li>
+      <li><strong>Time-based states are derived on read.</strong> <code>expired</code> comes from <code>expires_at</code> and <code>overdue</code> from <code>due_at</code>, so they're never stale.</li>
+      <li><strong>No cross-database foreign keys.</strong> Services refer to each other by ID only.</li>
+    </ul>
+  </div>
+  <aside class="notes">
+    Remaining spend is computed, not stored: a stored balance would need to be kept in step with every Transaction status change. The covering index makes the computed version cheap. Verifying that with EXPLAIN ANALYZE on a bulk seed is listed in further work.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Domain">
+  <h2>Two rules that matter most</h2>
+  <div class="grid-2">
+    <div>
+      <h3>Remaining spend</h3>
+      <p style="font-size: 20px;">Spending limit minus pending and settled Transactions in the current <strong>UTC month</strong>, never below zero.</p>
+      <pre style="font-size: 15px; margin-bottom: 14px;"><span class="c">// Card API, when the processor records a purchase</span>
+db.transaction().execute(<span class="k">async</span> (tx) =&gt; {
+  <span class="k">const</span> row = <span class="k">await</span> tx.selectFrom(<span class="s">"cards"</span>)&hellip;<span class="k">.forUpdate()</span>
+  <span class="k">const</span> spent = <span class="k">await</span> spentBetween(tx, row.id, period)
+  <span class="k">if</span> (spent + amount &gt; row.spendingLimit) <span class="k">throw</span> <span class="s">422</span>
+  <span class="k">return</span> tx.insertInto(<span class="s">"transactions"</span>)&hellip;
+})</pre>
+      <p style="font-size: 18px;" class="muted">The row lock serialises purchases on one Card, so two concurrent purchases can't together exceed the limit. The Screen and the check use the same month (ADR 0005).</p>
+    </div>
+    <div>
+      <h3>Card lifecycle</h3>
+      <svg viewBox="0 0 520 300" width="520" height="300" role="img" aria-label="Card lifecycle: inactive to active, active to and from frozen, any to closed; expired is derived">
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#2a8a7e"/></marker></defs>
+        <rect class="box" x="10" y="40" width="130" height="52" rx="26"/><text x="75" y="72" text-anchor="middle" font-size="17">inactive</text>
+        <rect class="box-soft" x="200" y="40" width="130" height="52" rx="26"/><text x="265" y="72" text-anchor="middle" font-size="17">active</text>
+        <rect class="box" x="380" y="40" width="130" height="52" rx="26"/><text x="445" y="72" text-anchor="middle" font-size="17">frozen</text>
+        <rect class="box-accent" x="200" y="190" width="130" height="52" rx="26"/><text x="265" y="222" text-anchor="middle" font-size="17" class="on-dark">closed</text>
+        <path class="edge-accent" d="M140 66 H198" marker-end="url(#arr)"/><text x="170" y="56" text-anchor="middle" class="lbl">activate</text>
+        <path class="edge-accent" d="M330 58 H378" marker-end="url(#arr)"/><text x="355" y="30" text-anchor="middle" class="lbl">freeze</text>
+        <path class="edge-accent" d="M380 76 H332" marker-end="url(#arr)"/><text x="355" y="112" text-anchor="middle" class="lbl">unfreeze</text>
+        <path class="edge" d="M75 92 C 75 170, 150 216, 198 216" marker-end="url(#arr)"/>
+        <path class="edge" d="M265 92 V188" marker-end="url(#arr)"/>
+        <path class="edge" d="M445 92 C 445 170, 380 216, 332 216" marker-end="url(#arr)"/>
+        <text x="265" y="268" text-anchor="middle" class="lbl">close: lost, stolen, cancelled</text>
+        <text x="10" y="294" font-size="14" fill="#5d6c6d">expired: derived from expires_at, from any open status</text>
+      </svg>
+    </div>
+  </div>
+  <aside class="notes">
+    UTC months are a trade-off: the purchase path carries no Company context, and fetching the Company's time zone would add a runtime dependency on Identity. A purchase in the first hour or two of a Swedish month counts towards the previous month. The fix (Company time zones replicated through events) is in further work.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; API">
+  <h2>Changing a Card: PUT with If-Match</h2>
+  <div class="grid-2" style="grid-template-columns: 1fr 1fr;">
+    <pre style="font-size: 16px;"><span class="k">PUT</span> /cards/{cardId}
+<span class="k">If-Match:</span> <span class="s">"c2a9f0"</span>        <span class="c">&larr; etag from the Screen</span>
+{ <span class="k">"status"</span>: <span class="s">"active"</span> }
+
+<span class="s">200</span>  the refreshed Screen
+<span class="s">428</span>  If-Match missing
+<span class="s">412</span>  Card changed since you read it: reload
+<span class="s">409</span>  not allowed from this status
+     + allowedTransitions
+<span class="s">400</span>  anything the contract doesn't allow</pre>
+    <ul>
+      <li><strong>Why PUT:</strong> it's idempotent, so a retry on a flaky mobile network is safe. The full representation is validated as one object.</li>
+      <li><strong>Why If-Match:</strong> it closes PUT's lost-update gap. The ETag is a hash of the canonical JSON (RFC 8785) of the Card, so it changes exactly when what a client sees changes.</li>
+      <li><strong>The server derives the transition</strong> by comparing the current and requested status, so no transition logic lives in the client.</li>
+      <li><span class="muted">Upgrade path: <code>POST /cards/{id}/activations</code> once transitions need their own input or an audit trail. (ADR 0002)</span></li>
+    </ul>
+  </div>
+  <aside class="notes">
+    The BFF forwards 404, 409 and 412 from the Card API as problem+json, and anything else from upstream becomes 502. All errors are RFC 9457 problem+json.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Code">
+  <h2>Every service is the same pipeline</h2>
+  <div class="grid-2" style="grid-template-columns: 1.25fr 1fr;">
+    <pre style="font-size: 15.5px;"><span class="c">// apps/card-api/src/server.ts</span>
+<span class="k">const</span> app = createService();
+<span class="c">// query parsing, validators, JSON bodies, /health</span>
+
+<span class="k">await</span> app.register(problemJson, { mapError: mapCardError });
+<span class="c">// every error leaves as RFC 9457 problem+json</span>
+
+<span class="k">await</span> app.register(demoIdentity, {
+  userId: config.DEMO_USER_ID,
+});
+<span class="c">// request.userId: the demo User (ADR 0006)</span>
+
+<span class="k">await</span> app.register(contract, {
+  path: contractPath(<span class="s">"card-api"</span>),
+  handlers: cardHandlers({ db }),
+});
+<span class="c">// routes + validation from the OpenAPI file,</span>
+<span class="c">// one handler per operationId</span></pre>
+    <div>
+      <ul>
+        <li><code>packages/service-kit</code> is the paved road from the first half, as code.</li>
+        <li>Handlers stay thin. Rules live in pure <code>domain/</code> functions with unit tests.</li>
+        <li>Kysely for type-safe SQL, with database types generated from the migrated schema.</li>
+        <li>Config is validated against a JSON schema at startup, so a bad environment fails fast.</li>
+        <li><strong>Known cut:</strong> no authentication. A fixed demo User stands in, and the middleware is where a verified JWT would go (ADR 0003, 0006).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Code">
+  <h2>The BFF: as parallel as the data allows</h2>
+  <svg viewBox="0 0 1136 330" width="1136" height="330" role="img" aria-label="Order of upstream calls for the card overview Screen">
+    <g font-size="15">
+      <text x="0" y="40">GET /me</text>
+      <text x="0" y="84">GET /invoices?limit=1</text>
+      <text x="0" y="128">GET /cards?holder=me</text>
+      <text x="0" y="172">GET /cards/{id}</text>
+      <text x="0" y="216">GET /cards/{id}/spend</text>
+      <text x="0" y="260">GET /cards/{id}/transactions</text>
+    </g>
+    <rect class="box-accent" x="260" y="22" width="170" height="26" rx="5"/>
+    <rect class="box-soft" x="440" y="66" width="440" height="26" rx="5"/>
+    <rect class="box-accent" x="440" y="110" width="190" height="26" rx="5"/>
+    <rect class="box-accent" x="640" y="154" width="200" height="26" rx="5"/>
+    <rect class="box-soft" x="640" y="198" width="180" height="26" rx="5"/>
+    <rect class="box-soft" x="640" y="242" width="220" height="26" rx="5"/>
+    <rect class="box" x="890" y="22" width="150" height="246" rx="8"/>
+    <text x="965" y="140" text-anchor="middle" font-size="16" font-weight="650">assemble</text>
+    <text x="965" y="162" text-anchor="middle" class="lbl">pure function</text>
+    <path class="edge dash" d="M260 290 H1040"/>
+    <text x="260" y="316" class="lbl">time &rarr;  each call has a timeout of about 1 s</text>
+    <rect class="box-accent" x="700" y="302" width="18" height="14" rx="3"/><text x="726" y="314" class="lbl">required: 502</text>
+    <rect class="box-soft" x="850" y="302" width="18" height="14" rx="3"/><text x="876" y="314" class="lbl">optional: unavailable</text>
+  </svg>
+  <ul style="margin-top: 6px;">
+    <li>Invoices depend only on the Company, so they load while the Card is still being found.</li>
+    <li><code>assembleCardOverview</code> has no I/O and is unit tested. The handler only does the fetching.</li>
+  </ul>
+  <aside class="notes">
+    handlers.ts orchestrates and screen.ts shapes. The BFF's clients are generated from the upstream contracts with openapi-fetch, so a contract change in the Card API shows up as a type error in the BFF.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<section class="slide" data-part="Appendix &middot; Quality">
+  <h2>How it's checked</h2>
+  <table>
+    <tr><th style="width: 26%;">Command</th><th>What it proves</th></tr>
+    <tr><td><code>pnpm test</code></td><td>Unit tests for the pure rules: card lifecycle, spend period, invoice status, Screen assembly, source routing.</td></tr>
+    <tr><td><code>pnpm test:contract</code></td><td>Schemathesis generates requests against each running service and checks every response against its contract.</td></tr>
+    <tr><td><code>pnpm test:smoke</code></td><td>End-to-end Card API behaviour: ETags, the lifecycle, the Spending limit.</td></tr>
+    <tr><td><code>pnpm lint:contracts</code></td><td>Redocly on all four contracts.</td></tr>
+    <tr><td><code>pnpm typecheck</code></td><td>Types generated from contracts and from the schema, across the workspace.</td></tr>
+  </table>
+  <p style="margin-top: 22px;" class="muted">Turborepo caches <code>build</code>, <code>typecheck</code>, <code>test</code> and <code>gen</code>, so a repeat run with no changes finishes in milliseconds. The whole stack is one command: <code>pnpm start</code>.</p>
+</section>
+
+</div>
+
+<div class="progress" id="progress"></div>
+<div class="notes-panel" id="notes"></div>
+
+<script>
+(() => {
+  const deck = document.getElementById("deck");
+  const slides = [...deck.querySelectorAll(".slide")];
+  const progress = document.getElementById("progress");
+  const notes = document.getElementById("notes");
+  let index = 0;
+
+  slides.forEach((slide, i) => slide.setAttribute("data-n", `${i + 1} / ${slides.length}`));
+
+  function fromHash() {
+    const n = parseInt(location.hash.slice(1), 10);
+    return Number.isInteger(n) ? Math.min(Math.max(n - 1, 0), slides.length - 1) : 0;
+  }
+
+  function show(i) {
+    index = Math.min(Math.max(i, 0), slides.length - 1);
+    slides.forEach((slide, j) => slide.classList.toggle("active", j === index));
+    progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+    const aside = slides[index].querySelector(".notes");
+    notes.innerHTML = `<b>Notes ${index + 1}</b> &nbsp; ${aside ? aside.innerHTML : "<i>none</i>"}`;
+    if (location.hash !== `#${index + 1}`) history.replaceState(null, "", `#${index + 1}`);
+  }
+
+  function fit() {
+    const scale = Math.min(innerWidth / 1280, innerHeight / 720);
+    deck.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const keys = {
+      ArrowRight: () => show(index + 1), ArrowDown: () => show(index + 1), PageDown: () => show(index + 1), " ": () => show(index + 1),
+      ArrowLeft: () => show(index - 1), ArrowUp: () => show(index - 1), PageUp: () => show(index - 1),
+      Home: () => show(0), End: () => show(slides.length - 1),
+      n: () => notes.classList.toggle("open"),
+      f: () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()),
+    };
+    const action = keys[e.key];
+    if (action) { e.preventDefault(); action(); }
+  });
+  addEventListener("hashchange", () => show(fromHash()));
+  addEventListener("resize", fit);
+
+  fit();
+  show(fromHash());
+})();
+</script>
+</body>
+</html>

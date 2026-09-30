@@ -212,4 +212,5 @@ The App BFF has the same pipeline but no database: `upstreams.ts` holds typed cl
 
 - [CONTEXT.md](CONTEXT.md): the domain language used in code, contracts and docs
 - [NOTES.md](NOTES.md): known simplifications and what I would do with more time
+- [docs/slides/index.html](docs/slides/index.html): the presentation for both tasks; open it in a browser (arrow keys to move, `n` for notes, `f` for fullscreen)
 - [docs/adr](docs/adr): why the services are split, why PUT with If-Match, the fixed demo User, feature-flagged upstreams, UTC spend periods
