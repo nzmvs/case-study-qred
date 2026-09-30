@@ -38,6 +38,53 @@ A fresh stack serves every upstream from its contract mock. Open Unleash at [loc
 
 Node 24 and TypeScript, Fastify 5 with routes and validation from the OpenAPI contracts (`fastify-openapi-glue`, Ajv), Postgres 18 with Kysely and `kysely-ctl`, Unleash for feature flags, Prism for contract mocks, Schemathesis for contract tests, pnpm workspaces with Turborepo, Docker Compose for the stack.
 
+## External dependencies
+
+**Runtime, in the service kit** (`packages/service-kit`, so every service gets them):
+
+| Package | Used for |
+|---|---|
+| `fastify` | HTTP server for every service |
+| `fastify-openapi-glue` | builds each service's routes from its OpenAPI contract, one handler per `operationId` |
+| `ajv`, `ajv-formats` | validates requests against the contract: coercing for query, path and headers, exact for bodies |
+| `qs` | parses query strings, including comma-separated arrays (`?status=active,frozen`) |
+| `@fastify/sensible` | HTTP error constructors (`httpErrors.notFound()` and so on), serialised as problem+json by the kit |
+| `fastify-plugin` | lets the kit's plugins (`problemJson`, `demoIdentity`, `contract`) apply to the whole app |
+| `env-schema` | validates each service's environment variables against a JSON schema at startup |
+| `kysely`, `pg` | type-safe SQL query builder over the Postgres driver |
+| `kysely-ctl` | runs migrations and seeds (also a dev dependency of each domain service, for its `kysely` command) |
+
+**Runtime, per service:**
+
+| Package | Service | Used for |
+|---|---|---|
+| `canonicalize` | Card API | canonical JSON (RFC 8785) of a Card, hashed into its ETag |
+| `openapi-fetch` | App BFF | typed HTTP clients for the Identity, Card and Billing APIs |
+| `unleash-client` | App BFF | reads the feature flags that pick mock or real per upstream |
+| `@fastify/reply-from` | demo harness | proxies the demo page's calls to the App BFF |
+
+**Development:**
+
+| Package | Used for |
+|---|---|
+| `typescript`, `@types/*` | type checking; the services run TypeScript directly through `tsx` in development |
+| `tsx` | runs and hot-reloads the TypeScript sources |
+| `openapi-typescript` | generates each app's TypeScript types from the contracts (`pnpm gen`) |
+| `kysely-codegen` | generates the database types from the migrated schema |
+| `turbo` | runs `build`, `typecheck`, `test` and `gen` across the workspace, cached |
+
+**Containers and tools outside `package.json`:**
+
+| Image or tool | Used for |
+|---|---|
+| `node:24-alpine` | base image for every service (`infra/Dockerfile`) |
+| `postgres:18-alpine` | the database server, one database per service |
+| `unleashorg/unleash-server:8.2` | the feature flag server and its UI at `localhost:4242` |
+| `@stoplight/prism-cli` | contract mocks, installed into `infra/prism` (the official Prism image fails to start) |
+| `python:3.13-alpine` | runs the Unleash flag seeder (`infra/unleash/seed.py`) |
+| `schemathesis/schemathesis` | contract tests (`pnpm test:contract`), run in Docker |
+| `@redocly/cli` | contract linting (`pnpm lint:contracts`), fetched on demand with `pnpm dlx` |
+
 ## Services
 
 | Service | Port | Contract | What it owns |
