@@ -4,7 +4,7 @@ Backend for the card overview screen of the Qred mobile app: the selected Compan
 
 ## Run it
 
-Requires Docker. Host-side scripts use Node 24 and pnpm 10.
+Requires Docker. Host-side scripts use Node 24, pnpm 10 and Python 3.9+ (the test runners).
 
 ```sh
 pnpm start          # build and start the stack, wait until healthy
@@ -23,6 +23,20 @@ curl localhost:3000/screens/card-overview
 Or open the demo harness at [localhost:3100](http://localhost:3100): a dev-only page that renders the Screen, switches each upstream between mock and real, activates or freezes the Card, and simulates purchases as the Card processor.
 
 A fresh stack serves every upstream from its contract mock. Open Unleash at [localhost:4242](http://localhost:4242) (`admin` / `unleash4all`) and turn on `bff-identity-api-real`, `bff-card-api-real` or `bff-billing-api-real` to switch that upstream to the real service. The response header `Qred-Data-Sources` shows which served it ([ADR 0004](docs/adr/0004-flagged-upstream-sources-in-bff.md)).
+
+## Where the case lives
+
+| The case asks for | Where it is |
+|---|---|
+| Database schema | `apps/*/src/db/migrations/`: one Postgres database per service |
+| Payload response for the screen | [contracts/app-bff.yaml](contracts/app-bff.yaml): `GET /screens/card-overview` returns the whole screen in one payload |
+| API structure | the App BFF over three domain services, each with its own contract ([ADR 0001](docs/adr/0001-card-api-and-bff-split.md)) |
+| Code implementation | `apps/` and `packages/service-kit/`, described below |
+| Notes on further work | [NOTES.md](NOTES.md) |
+
+## Stack
+
+Node 24 and TypeScript, Fastify 5 with routes and validation from the OpenAPI contracts (`fastify-openapi-glue`, Ajv), Postgres 18 with Kysely and `kysely-ctl`, Unleash for feature flags, Prism for contract mocks, Schemathesis for contract tests, pnpm workspaces with Turborepo, Docker Compose for the stack.
 
 ## Services
 
@@ -55,6 +69,8 @@ tests/contract/     Schemathesis configuration per service
 scripts/            contract and smoke test runners (Python 3.9+, standard library only)
 docs/adr/           architecture decisions
 CONTEXT.md          domain glossary
+NOTES.md            known simplifications and further work
+turbo.json          workspace tasks: build, typecheck, test, gen
 ```
 
 ## How a service is structured
@@ -104,6 +120,7 @@ The App BFF has the same pipeline but no database: `upstreams.ts` holds typed cl
 |---|---|
 | `pnpm test` | unit tests in every package |
 | `pnpm typecheck` | TypeScript across the workspace |
+| `pnpm build` | compiles every package in dependency order |
 | `pnpm test:contract` | Schemathesis generates requests against each running service and checks every response against its contract |
 | `pnpm test:smoke` | Card API behaviour: ETags, the card lifecycle, the Spending limit |
 | `pnpm lint:contracts` | lints the OpenAPI contracts |
@@ -112,7 +129,7 @@ The App BFF has the same pipeline but no database: `upstreams.ts` holds typed cl
 | `pnpm logs` | follows the stack's logs |
 | `pnpm compose ...` | any other `docker compose` command for this stack |
 
-The contract and smoke tests change data and reseed afterwards. In the dev stack, starting or restarting a service also reseeds its demo data.
+`test`, `typecheck`, `build` and `gen` run through Turborepo and are cached: a repeat run with no changes finishes in milliseconds. The contract and smoke tests run against the running stack (`pnpm start` first); they change data and reseed afterwards. In the dev stack, starting or restarting a service also reseeds its demo data.
 
 ## Further reading
 
