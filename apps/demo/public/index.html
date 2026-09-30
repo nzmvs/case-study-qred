@@ -61,6 +61,7 @@
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
   .panel h2 { margin: 0 0 10px; font-size: 14px; }
   .panel p.note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .panel p.note.warn { color: var(--warn); }
   .flags { display: grid; gap: 8px; }
   .flag { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
   .source { font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; }
@@ -97,10 +98,11 @@
     <div class="panel">
       <h2>Simulate a purchase</h2>
       <p class="note">Records a Transaction on the real Card API as the Card processor would, then reloads the Screen. Over the Remaining spend it is refused.</p>
+      <p class="note warn" id="card-mock" hidden>The Screen reads the Card API mock: it answers every Company with the same example Card and keeps no changes, so purchases, activate and freeze show nothing. Switch the Card API to real first.</p>
       <form class="purchase" id="purchase">
         <input id="amount" type="number" min="1" step="1" value="250" aria-label="Amount in kronor">
         <input id="merchant" type="text" value="Pressbyrån" aria-label="Merchant">
-        <button type="submit">Buy</button>
+        <button type="submit" id="buy">Buy</button>
       </form>
     </div>
 
@@ -117,7 +119,6 @@
 </main>
 
 <script>
-const UPSTREAMS = ["identity", "card", "billing"];
 const ACTION_LABEL = { activate: "Activate card", freeze: "Freeze card", unfreeze: "Unfreeze card" };
 const FLAG_PROPAGATION_MS = 2500;
 
@@ -148,7 +149,11 @@ async function call(url, options = {}) {
 }
 
 function received({ response, body, ms }) {
-  $("sources").textContent = `Qred-Data-Sources: ${response.headers.get("qred-data-sources") ?? "(not sent)"}`;
+  const sources = response.headers.get("qred-data-sources");
+  $("sources").textContent = `Qred-Data-Sources: ${sources ?? "(not sent)"}`;
+  const cardMocked = /\bcard=mock\b/.test(sources ?? "");
+  $("card-mock").hidden = !cardMocked;
+  $("buy").disabled = cardMocked;
   if (!response.ok) { showProblem(response.status, body); return false; }
   clearProblem();
   screen = body;
@@ -237,9 +242,9 @@ async function changeCard(status) {
 }
 
 async function loadFlags() {
-  const { body } = await call("/flags");
-  $("flags").innerHTML = UPSTREAMS.map((u) => {
-    const real = body?.[u];
+  const { response, body } = await call("/flags");
+  if (!response.ok) { showProblem(response.status, body); return; }
+  $("flags").innerHTML = Object.entries(body).map(([u, real]) => {
     return `<div class="flag"><span>${u} API <span class="source ${real ? "real" : "mock"}">${real ? "real" : "mock"}</span></span>
       <span class="switch">
         <button data-upstream="${u}" data-real="false" aria-pressed="${real === false}">mock</button>

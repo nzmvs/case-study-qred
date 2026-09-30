@@ -1,6 +1,6 @@
 /**
- * Dev-only demo harness: serves the demo page, proxies it to the App BFF as a demo User, toggles the
- * BFF's upstream flags in Unleash, and records purchases as the Card processor would. Never deployed.
+ * Dev-only demo harness: serves the demo page, proxies its calls to the App BFF, toggles the BFF's
+ * upstream flags in Unleash, and records purchases as the Card processor would. Never deployed.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
