@@ -14,7 +14,7 @@
     "dev": "pnpm compose up --build --watch",
     "down": "pnpm compose --profile mock down",
     "logs": "pnpm compose logs --follow",
-    "db:reset": "for s in identity-api card-api billing-api; do pnpm compose exec -T $s pnpm --filter @qred/$s db:reset; done",
+    "db:reset": "for s in identity-api card-api billing-api; do pnpm compose exec -T $s pnpm --filter @qred/$s db:seed; done",
     "gen": "pnpm -r gen:api",
     "lint:contracts": "pnpm --package=@redocly/cli dlx redocly lint contracts/*.yaml",
     "test:contract": "python3 scripts/contract_tests.py",

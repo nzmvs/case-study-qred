@@ -95,7 +95,7 @@ def spend_period() -> tuple[str, str]:
 
 def reseed() -> None:
     compose = ["docker", "compose", "-f", str(ROOT / "infra/docker-compose.yml")]
-    subprocess.run([*compose, "exec", "-T", "card-api", "pnpm", "--filter", "@qred/card-api", "db:reset"], check=True, capture_output=True)
+    subprocess.run([*compose, "exec", "-T", "card-api", "pnpm", "--filter", "@qred/card-api", "db:seed"], check=True, capture_output=True)
 
 
 def main() -> int:

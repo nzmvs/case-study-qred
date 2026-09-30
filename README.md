@@ -67,11 +67,11 @@ CONTEXT.md          domain glossary
 | `pnpm test:smoke` | Card API behaviour: ETags, the card lifecycle, the Spending limit |
 | `pnpm lint:contracts` | lints the OpenAPI contracts |
 | `pnpm gen` | regenerates TypeScript types from the contracts |
-| `pnpm db:reset` | reseeds the demo data |
+| `pnpm db:reset` | reseeds the demo data (migrations and seeds run through `kysely-ctl`) |
 | `pnpm logs` | follows the stack's logs |
 | `pnpm compose ...` | any other `docker compose` command for this stack |
 
-The contract and smoke tests change data and reseed afterwards.
+The contract and smoke tests change data and reseed afterwards. Starting or restarting a service also reseeds its demo data.
 
 ## Further reading
 

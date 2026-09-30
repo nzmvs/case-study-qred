@@ -1,5 +1,5 @@
 import { sql } from "kysely";
-import type { Database } from "./database.js";
+import type { Database } from "../database.js";
 
 // Fixed ids shared with the other services' seeds and the contract examples.
 const COMPANY_AB = "00000000-0000-4000-a000-000000000101";
@@ -18,19 +18,14 @@ function localMidnight(date: string): Date {
 
 const isoDate = (year: number, monthIndex: number, day: number) => new Date(Date.UTC(year, monthIndex, day)).toISOString().slice(0, 10);
 
-export async function seedIfEmpty(db: Database, now = new Date()): Promise<void> {
-  const existing = await db.selectFrom("invoices").select(db.fn.countAll<number>().as("count")).executeTakeFirstOrThrow();
-  if (Number(existing.count) > 0) return;
-  await seed(db, now);
-}
-
-export async function reseed(db: Database, now = new Date()): Promise<void> {
+/** kysely-ctl seed: resets this service's demo data on every run. */
+export async function seed(db: Database): Promise<void> {
   await sql`TRUNCATE invoices`.execute(db);
-  await seed(db, now);
+  await insertDemoData(db, new Date());
 }
 
 /** Company AB: last month's Invoice paid, this month's due on the 15th of next month. Nordic Trading has none. */
-async function seed(db: Database, now: Date): Promise<void> {
+async function insertDemoData(db: Database, now: Date): Promise<void> {
   const [y, m] = [now.getUTCFullYear(), now.getUTCMonth()];
   const invoice = (id: string, monthOffset: number, amount: number, status: "open" | "paid") => {
     const dueDate = isoDate(y, m + monthOffset + 1, 15);

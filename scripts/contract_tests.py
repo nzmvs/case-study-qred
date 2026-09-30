@@ -34,7 +34,7 @@ def run_schemathesis(service: str) -> bool:
 
 def reseed() -> None:
     for service in SEEDED:
-        subprocess.run([*COMPOSE, "exec", "-T", service, "pnpm", "--filter", f"@qred/{service}", "db:reset"], check=True, capture_output=True)
+        subprocess.run([*COMPOSE, "exec", "-T", service, "pnpm", "--filter", f"@qred/{service}", "db:seed"], check=True, capture_output=True)
     print("seeds reset")
 
 

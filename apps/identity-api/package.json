@@ -8,9 +8,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --conditions=source --test 'src/**/*.test.ts'",
-    "db:migrate": "tsx --conditions=source src/db/cli.ts migrate",
-    "db:seed": "tsx --conditions=source src/db/cli.ts seed",
-    "db:reset": "tsx --conditions=source src/db/cli.ts reset",
+    "db:migrate": "kysely migrate latest",
+    "db:seed": "kysely seed run",
     "db:codegen": "kysely-codegen --dialect postgres --camel-case --exclude-pattern 'kysely_*' --out-file src/db/types.ts",
     "gen:api": "openapi-typescript ../../contracts/identity-api.yaml -o src/generated/identity-api.ts"
   },
@@ -22,6 +21,7 @@
   },
   "devDependencies": {
     "kysely-codegen": "^0.20.0",
+    "kysely-ctl": "^0.21.0",
     "openapi-typescript": "^7.13.0",
     "pg": "^8.23.0"
   }

@@ -1,8 +1,8 @@
 import { sql } from "kysely";
-import type { Database } from "./database.js";
-import { CardStatus } from "../domain/card-lifecycle.js";
-import { spendPeriodOf } from "../domain/spend-period.js";
-import { TransactionStatus } from "../domain/transaction-status.js";
+import type { Database } from "../database.js";
+import { CardStatus } from "../../domain/card-lifecycle.js";
+import { spendPeriodOf } from "../../domain/spend-period.js";
+import { TransactionStatus } from "../../domain/transaction-status.js";
 
 // Fixed ids shared with the other services' seeds and the contract examples.
 const ANNA = "00000000-0000-4000-a000-000000000001";
@@ -54,18 +54,13 @@ function companyAbTransactions(now: Date): SeedTransaction[] {
   return [...previous, ...current];
 }
 
-export async function seedIfEmpty(db: Database, now = new Date()): Promise<void> {
-  const existing = await db.selectFrom("cards").select(db.fn.countAll<number>().as("count")).executeTakeFirstOrThrow();
-  if (Number(existing.count) > 0) return;
-  await seed(db, now);
-}
-
-export async function reseed(db: Database, now = new Date()): Promise<void> {
+/** kysely-ctl seed: resets this service's demo data on every run. */
+export async function seed(db: Database): Promise<void> {
   await sql`TRUNCATE transactions, cards`.execute(db);
-  await seed(db, now);
+  await insertDemoData(db, new Date());
 }
 
-async function seed(db: Database, now: Date): Promise<void> {
+async function insertDemoData(db: Database, now: Date): Promise<void> {
   await db.transaction().execute(async (tx) => {
     await tx
       .insertInto("cards")

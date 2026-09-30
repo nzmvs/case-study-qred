@@ -58,7 +58,6 @@ These are deliberate and visible in the running system.
 
 ## Tooling observations
 
-- The hand-written migrate, seed and reset CLI (`packages/service-kit/src/db-cli.ts`) could give way to `kysely-ctl`, Kysely's own CLI for migrations and seeds.
 
 - The official `stoplight/prism` image crashes on startup, so the mocks run the Prism npm package (`infra/prism`).
 - The Prism mocks answer a missing `If-Match` with a generic validation error (`400` for the App BFF, `422` for the Card API); the real services answer `428` as the contracts say.
