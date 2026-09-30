@@ -19,7 +19,7 @@ export type CardOverviewInputs = {
   invoices: Section<{ items: Billing["schemas"]["Invoice"][] }>;
 };
 
-const LATEST_TRANSACTIONS = 3;
+export const LATEST_TRANSACTIONS = 3;
 const SCREEN_ACTIONS: readonly string[] = ["activate", "freeze", "unfreeze"] satisfies CardSummary["actions"][number]["action"][];
 
 function toCardSummary({ data: card, etag }: NonNullable<CardOverviewInputs["card"]>, holderName: string): CardSummary {

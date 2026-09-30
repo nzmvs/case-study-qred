@@ -1,9 +1,9 @@
 import { httpErrors } from "@qred/service-kit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { operations } from "./generated/app-bff.js";
-import { assembleCardOverview, type CardOverviewScreen } from "./screen.js";
+import { assembleCardOverview, type CardOverviewScreen, LATEST_TRANSACTIONS } from "./screen.js";
 import { describeSources, type Routing, route } from "./sources.js";
-import { badGateway, forwardProblem, optional, required, type Upstreams } from "./upstreams.js";
+import { badGateway, optional, required, type Upstreams } from "./upstreams.js";
 
 type ScreenQuery = NonNullable<operations["getCardOverviewScreen"]["parameters"]["query"]>;
 type PutCardPath = operations["putCard"]["parameters"]["path"];
@@ -12,9 +12,12 @@ type PutCardBody = operations["putCard"]["requestBody"]["content"]["application/
 
 const OPEN_CARD_STATUSES = ["inactive", "active", "frozen"] as const;
 const DUE_INVOICE_STATUSES = ["open", "overdue"] as const;
+const CARD_NOT_FOUND = new Set([404]);
 const FORWARDED_CARD_ERRORS = new Set([404, 409, 412]);
 
 export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutMs: number }) {
+  const call = () => ({ signal: AbortSignal.timeout(timeoutMs) });
+
   function routeFor(request: FastifyRequest, reply: FastifyReply): Upstreams {
     const { upstreams, sources } = route(routing, request.userId);
     if (routing.mock) reply.header("Qred-Data-Sources", describeSources(sources));
@@ -25,8 +28,6 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
     { identity, card, billing }: Upstreams,
     companyId: string | undefined,
   ): Promise<CardOverviewScreen> {
-    const call = () => ({ signal: AbortSignal.timeout(timeoutMs) });
-
     const { data: me } = await required("Identity API", identity.GET("/me", call()));
     const selectedCompanyId = companyId ?? me.companies[0]?.id;
     if (!selectedCompanyId || !me.companies.some((c) => c.id === selectedCompanyId)) {
@@ -58,7 +59,7 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
     const [cardResult, spend, transactions] = await Promise.all([
       required("Card API", card.GET("/cards/{cardId}", { params: path, ...call() })),
       optional(card.GET("/cards/{cardId}/spend", { params: path, ...call() })),
-      optional(card.GET("/cards/{cardId}/transactions", { params: { ...path, query: { limit: 3 } }, ...call() })),
+      optional(card.GET("/cards/{cardId}/transactions", { params: { ...path, query: { limit: LATEST_TRANSACTIONS } }, ...call() })),
     ]);
     const etag = cardResult.response.headers.get("etag");
     if (!etag) throw badGateway("Card API answered without an ETag.");
@@ -81,27 +82,23 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
     async putCard(request: FastifyRequest<{ Params: PutCardPath; Headers: PutCardHeaders; Body: PutCardBody }>, reply: FastifyReply) {
       const upstreams = routeFor(request, reply);
       const { card } = upstreams;
-      const call = () => ({ signal: AbortSignal.timeout(timeoutMs) });
       const path = { path: { cardId: request.params.cardId } };
 
-      const current = await card.GET("/cards/{cardId}", { params: path, ...call() }).catch(() => undefined);
-      if (current?.response.status === 404) throw forwardProblem(404, current.error);
-      if (!current?.data) throw badGateway("Card API did not answer.");
+      const { data: current } = await required("Card API", card.GET("/cards/{cardId}", { params: path, ...call() }), CARD_NOT_FOUND);
 
       // Full representation (ADR 0002): the Screen changes only the status; settings are sent back as read.
       // The client's If-Match still guards them, so a concurrent change to the limit fails with 412.
-      const updated = await card
-        .PUT("/cards/{cardId}", {
+      await required(
+        "Card API",
+        card.PUT("/cards/{cardId}", {
           params: { ...path, header: { "If-Match": request.headers["if-match"] } },
-          body: { settings: current.data.settings, state: { status: request.body.status, closedReason: null } },
+          body: { settings: current.settings, state: { status: request.body.status, closedReason: null } },
           ...call(),
-        })
-        .catch(() => undefined);
-      if (!updated) throw badGateway("Card API did not answer.");
-      if (FORWARDED_CARD_ERRORS.has(updated.response.status)) throw forwardProblem(updated.response.status, updated.error);
-      if (!updated.response.ok) throw badGateway(`Card API answered ${updated.response.status}.`);
+        }),
+        FORWARDED_CARD_ERRORS,
+      );
 
-      return loadCardOverview(upstreams, current.data.details.companyId);
+      return loadCardOverview(upstreams, current.details.companyId);
     },
   };
 }
