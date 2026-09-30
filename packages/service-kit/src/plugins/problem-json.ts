@@ -40,7 +40,7 @@ function fromFastify(error: FastifyError, request: FastifyRequest): HttpError {
   return httpErrors.internalServerError();
 }
 
-export function problemHandler(mapError: ErrorMapper = () => undefined) {
+function problemHandler(mapError: ErrorMapper = () => undefined) {
   return (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
     const problem = error instanceof HttpError ? error : (mapError(error) ?? fromFastify(error, request));
     const status = problem.statusCode;

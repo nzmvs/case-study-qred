@@ -8,8 +8,8 @@ import { TransactionStatus } from "../../domain/transaction-status.js";
 const ANNA = "00000000-0000-4000-a000-000000000001";
 const COMPANY_AB = "00000000-0000-4000-a000-000000000101";
 const NORDIC_TRADING = "00000000-0000-4000-a000-000000000102";
-export const CARD_COMPANY_AB = "00000000-0000-4000-a000-000000000201";
-export const CARD_NORDIC_TRADING = "00000000-0000-4000-a000-000000000202";
+const CARD_COMPANY_AB = "00000000-0000-4000-a000-000000000201";
+const CARD_NORDIC_TRADING = "00000000-0000-4000-a000-000000000202";
 
 const MERCHANTS = ["Espresso House", "Clas Ohlson", "SJ AB", "Circle K", "Webhallen", "Ahlsell", "Pressbyrån", "Staples"];
 
