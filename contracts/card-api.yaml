@@ -4,20 +4,19 @@ info:
   version: 0.1.0
   description: |
     Owns Cards and Transactions and their lifecycles. Depends on no other
-    service at runtime. A User may only reach their own Cards in Companies
-    they are a member of, as stated by the caller's principal (ADR 0003;
-    mocked in this case by demo principal names such as `anna`).
+    service at runtime. A User only reaches their own Cards; the User is a
+    fixed demo User injected by middleware (ADR 0006).
 
     All money is in minor units (öre) with an ISO 4217 currency. Errors use
     `application/problem+json` (RFC 9457). Resources that are not visible to
-    the caller answer `404`, never `403`.
+    the User answer `404`.
     Every path answers undeclared methods with `405 Method Not Allowed` and an
     `Allow` header, and rejects unknown query parameters with `400`.
 servers:
   - url: http://localhost:3002
     description: Local (docker compose)
-security:
-  - bearerAuth: []
+# No authentication: every request acts as the fixed demo User (ADR 0006).
+security: []
 
 paths:
   /cards:
@@ -32,7 +31,7 @@ paths:
         - name: holder
           in: query
           required: true
-          description: Only the caller's own Cards can be listed.
+          description: Only the User's own Cards can be listed.
           schema: { type: string, enum: [me] }
         - name: status
           in: query
@@ -59,7 +58,6 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Card" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /cards/{cardId}:
     parameters:
@@ -76,7 +74,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Card" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     put:
       operationId: putCard
@@ -105,7 +102,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Card" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/IllegalTransition" }
         "412": { $ref: "#/components/responses/PreconditionFailed" }
@@ -140,7 +136,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Spend" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /cards/{cardId}/transactions:
@@ -166,15 +161,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TransactionPage" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createCardTransaction
       summary: Record a Transaction authorised on a Card
       description: |
-        Called by the card processor when a purchase is authorised. Requires
-        a client principal with the `transactions:write` scope (the demo
-        principal `card-processor`); User principals are rejected with `403`. The
+        Called by the card processor when a purchase is authorised. The
         Transaction starts `pending`. Rejected when the Card is not `active`
         or the amount exceeds the Card's Remaining spend in the Spend period
         (the UTC calendar month, ADR 0005) that contains `occurredAt`.
@@ -194,19 +186,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Transaction" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/CardNotActive" }
         "422": { $ref: "#/components/responses/Unprocessable" }
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      description: Caller principal; a demo principal name in this case (ADR 0003).
-
   parameters:
     CardId:
       name: cardId
@@ -481,18 +465,8 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
-    Unauthorized:
-      description: Missing or unknown principal.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
-    Forbidden:
-      description: The caller's principal lacks the required scope.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
     NotFound:
-      description: The Card does not exist or is not visible to the caller.
+      description: The Card does not exist or is not the User's.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }

@@ -1,9 +1,7 @@
 # Schemathesis: generated requests against the real App BFF, every response checked against its contract.
-headers = { Authorization = "Bearer anna" }
-
 [checks]
 # ADR 0002: a missing If-Match is 428 Precondition Required (RFC 6585), documented in the contract.
-missing_required_header.expected-statuses = ["400", "401", "403", "428"]
+missing_required_header.expected-statuses = ["400", "428"]
 
 [parameters]
 cardId = "00000000-0000-4000-a000-000000000202"
@@ -13,4 +11,4 @@ companyId = "00000000-0000-4000-a000-000000000101"
 # transition the current status does not allow is 409.
 [[operations]]
 include-name = "PUT /cards/{cardId}"
-checks = { positive_data_acceptance = { expected-statuses = ["200", "401", "404", "409", "412"] } }
+checks = { positive_data_acceptance = { expected-statuses = ["200", "404", "409", "412"] } }

@@ -1,4 +1,4 @@
-import { createDatabase, parsePrincipals, type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
+import { createDatabase, type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
 import envSchema from "env-schema";
 import { buildApp } from "./app.js";
 import type { DB } from "./db/types.js";
@@ -13,7 +13,7 @@ const config = envSchema<ServiceEnv & { DATABASE_URL: string }>({
 
 const app = await buildApp({
   db: createDatabase<DB>(config.DATABASE_URL),
-  principals: parsePrincipals(config.AUTH_PRINCIPALS),
+  demoUserId: config.DEMO_USER_ID,
   ...(config.CONTRACT_PATH ? { contractPath: config.CONTRACT_PATH } : {}),
   logger: true,
 });

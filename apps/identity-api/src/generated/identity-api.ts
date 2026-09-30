@@ -53,34 +53,8 @@ export interface components {
             id: components["schemas"]["Id"];
             name: string;
         };
-        Problem: {
-            /** Format: uri-reference */
-            type: string;
-            title: string;
-            status: number;
-            detail?: string;
-        };
     };
-    responses: {
-        /** @description Missing or unknown principal. */
-        Unauthorized: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
-        /** @description The caller is a client principal, not a User. */
-        Forbidden: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
-    };
+    responses: never;
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -106,8 +80,6 @@ export interface operations {
                     "application/json": components["schemas"]["Me"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
         };
     };
 }

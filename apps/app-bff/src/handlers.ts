@@ -14,24 +14,18 @@ const OPEN_CARD_STATUSES = ["inactive", "active", "frozen"] as const;
 const DUE_INVOICE_STATUSES = ["open", "overdue"] as const;
 const FORWARDED_CARD_ERRORS = new Set([404, 409, 412]);
 
-function userIdOf(request: FastifyRequest): string {
-  if (request.principal.kind !== "user") throw httpErrors.unauthorized("The App BFF serves Users only.");
-  return request.principal.userId;
-}
-
 export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutMs: number }) {
   function routeFor(request: FastifyRequest, reply: FastifyReply): Upstreams {
-    const { upstreams, sources } = route(routing, userIdOf(request));
+    const { upstreams, sources } = route(routing, request.userId);
     if (routing.mock) reply.header("Qred-Data-Sources", describeSources(sources));
     return upstreams;
   }
 
   async function loadCardOverview(
     { identity, card, billing }: Upstreams,
-    authorization: string,
     companyId: string | undefined,
   ): Promise<CardOverviewScreen> {
-    const call = () => ({ headers: { authorization }, signal: AbortSignal.timeout(timeoutMs) });
+    const call = () => ({ signal: AbortSignal.timeout(timeoutMs) });
 
     const { data: me } = await required("Identity API", identity.GET("/me", call()));
     const selectedCompanyId = companyId ?? me.companies[0]?.id;
@@ -88,14 +82,13 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
 
   return {
     async getCardOverviewScreen(request: FastifyRequest<{ Querystring: ScreenQuery }>, reply: FastifyReply) {
-      return loadCardOverview(routeFor(request, reply), request.headers.authorization!, request.query.companyId);
+      return loadCardOverview(routeFor(request, reply), request.query.companyId);
     },
 
     async putCard(request: FastifyRequest<{ Params: PutCardPath; Headers: PutCardHeaders; Body: PutCardBody }>, reply: FastifyReply) {
       const upstreams = routeFor(request, reply);
       const { card } = upstreams;
-      const authorization = request.headers.authorization!;
-      const call = () => ({ headers: { authorization }, signal: AbortSignal.timeout(timeoutMs) });
+      const call = () => ({ signal: AbortSignal.timeout(timeoutMs) });
       const path = { path: { cardId: request.params.cardId } };
 
       const current = await card.GET("/cards/{cardId}", { params: path, ...call() }).catch(() => undefined);
@@ -115,7 +108,7 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
       if (FORWARDED_CARD_ERRORS.has(updated.response.status)) throw forwardProblem(updated.response.status, updated.error);
       if (!updated.response.ok) throw badGateway(`Card API answered ${updated.response.status}.`);
 
-      return loadCardOverview(upstreams, authorization, current.data.details.companyId);
+      return loadCardOverview(upstreams, current.data.details.companyId);
     },
   };
 }

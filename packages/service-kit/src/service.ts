@@ -3,7 +3,7 @@ import { Ajv, type Options as AjvOptions } from "ajv";
 import addFormats from "ajv-formats";
 import openapiGlue from "fastify-openapi-glue";
 import qs from "qs";
-import { type Principals, registerBearerAuth } from "./auth.js";
+import { injectDemoUser } from "./identity.js";
 import { httpErrors } from "@fastify/sensible";
 import { type ErrorMapper, problemHandler } from "./problems.js";
 
@@ -11,7 +11,7 @@ type ServiceOptions = {
   /** The service's OpenAPI contract: routes, validation and serialisation all come from it. */
   contractPath: string;
   serviceHandlers: object;
-  principals: Principals;
+  demoUserId: string;
   mapError?: ErrorMapper;
   logger?: FastifyServerOptions["logger"];
 };
@@ -56,7 +56,7 @@ function requireBody(route: RouteOptions) {
   route.preValidation = [check, ...[route.preValidation ?? []].flat()];
 }
 
-export async function buildService({ contractPath, serviceHandlers, principals, mapError, logger = false }: ServiceOptions) {
+export async function buildService({ contractPath, serviceHandlers, demoUserId, mapError, logger = false }: ServiceOptions) {
   const app = Fastify({
     logger,
     // The contracts' array query parameters use `style: form, explode: false`: `?status=a,b`.
@@ -78,19 +78,11 @@ export async function buildService({ contractPath, serviceHandlers, principals, 
   });
   app.get("/health", async () => ({ status: "ok" }));
 
-  // Every contract operation requires a principal. Authenticating before validation means an
-  // unauthenticated caller gets 401 and learns nothing about what a valid request looks like.
-  await registerBearerAuth(app, principals);
-  app.addHook("onRequest", (request, reply, done) => {
-    if (request.routeOptions.url === "/health") return done();
-    app.verifyBearerAuth!(request, reply, done);
-  });
+  injectDemoUser(app, demoUserId);
 
   await app.register(openapiGlue, {
     specification: contractPath,
     serviceHandlers,
-    // The contracts' bearerAuth scheme is already enforced by the onRequest hook above.
-    securityHandlers: { bearerAuth: async () => {} },
   });
 
   // A known path with an undeclared method is 405 with Allow (RFC 9110), not 404.

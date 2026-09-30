@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildService, type Principals } from "@qred/service-kit";
+import { buildService } from "@qred/service-kit";
 import type { Database } from "./db/database.js";
 import { cardHandlers } from "./handlers.js";
 import { mapCardError } from "./problems.js";
@@ -9,11 +9,11 @@ const DEFAULT_CONTRACT = path.resolve(path.dirname(fileURLToPath(import.meta.url
 
 type AppOptions = {
   db: Database;
-  principals: Principals;
+  demoUserId: string;
   contractPath?: string;
   logger?: boolean;
 };
 
-export function buildApp({ db, principals, contractPath = DEFAULT_CONTRACT, logger = false }: AppOptions) {
-  return buildService({ contractPath, serviceHandlers: cardHandlers({ db }), principals, mapError: mapCardError, logger });
+export function buildApp({ db, demoUserId, contractPath = DEFAULT_CONTRACT, logger = false }: AppOptions) {
+  return buildService({ contractPath, serviceHandlers: cardHandlers({ db }), demoUserId, mapError: mapCardError, logger });
 }

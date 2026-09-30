@@ -1,0 +1,3 @@
+# Every request acts as a fixed demo User
+
+Supersedes [ADR 0003](0003-membership-in-access-token.md). Authentication is out of scope for this case, so a middleware in every service sets `request.userId` to one demo User (Anna, from the seeds) and nothing else carries identity: no tokens, no Membership claims, no client principals. The Card API still only shows a User their own Cards. The Billing API trusts its callers to ask for their own Companies, which the App BFF checks against the Identity API, and recording Transactions is open to any caller. A real system would set `request.userId` from a verified token in that same middleware; ADR 0003 describes that design.

@@ -6,8 +6,8 @@ What was cut to keep the case to its scope, what is knowingly simplified, and wh
 
 These are deliberate and visible in the running system.
 
-- **Authentication is mocked.** Bearer tokens are demo principal names resolved from configuration ([ADR 0003](docs/adr/0003-membership-in-access-token.md)). The domain checks behind them (Membership, own Card only, the processor scope) are real.
-- **Anyone who can see a Card can change its Spending limit.** There are no roles yet.
+- **There is no authentication.** Every request acts as one demo User ([ADR 0006](docs/adr/0006-fixed-demo-user.md)). The Card API still limits a User to their own Cards; Membership checks in the Card and Billing APIs, and the processor-only rule for recording Transactions, are left out.
+- **Any User can change their Card's Spending limit.** There are no roles yet.
 - **Spend periods are UTC calendar months** ([ADR 0005](docs/adr/0005-spend-periods-are-utc-months.md)), so a purchase in the first hour or two of a local month counts towards the previous one.
 - **Expiry is derived on read.** Nothing stores `expired`, so SQL cannot filter on it and the one-open-Card rule is only enforced for `closed`.
 - **Feature flags switch per User only**, never per Company, because a Card change cannot know its Company before choosing a source.
@@ -30,7 +30,7 @@ These are deliberate and visible in the running system.
 
 - **Identity events.** `MembershipGranted`, `MembershipRevoked` and `CompanyUpdated` published by the Identity API and projected locally by the Card and Billing APIs, through an outbox so no event is lost. This removes the token-lifetime staleness from ADR 0003 and gives the Card API Company time zones for local Spend periods.
 - **Transaction events.** `TransactionRecorded` and `TransactionSettled` feeding Billing, so Invoices follow spend.
-- **Real authentication.** An OIDC provider with the authorisation code flow and PKCE for the app, client credentials for the processor, JWT verification in `packages/service-kit/src/auth.ts` (the only file that changes), and key rotation through JWKS.
+- **Real authentication** as in [ADR 0003](docs/adr/0003-membership-in-access-token.md): an OIDC provider with the authorisation code flow and PKCE for the app, client credentials for the processor, and short-lived JWTs carrying Membership claims. The identity middleware (`packages/service-kit/src/identity.ts`) would set `request.userId` from the verified token, and the Membership and processor-scope checks come back.
 
 ## App BFF and contracts
 

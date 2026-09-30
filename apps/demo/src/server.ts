@@ -17,8 +17,6 @@ const config = envSchema<{
   UNLEASH_URL: string;
   UNLEASH_ADMIN_USER: string;
   UNLEASH_ADMIN_PASSWORD: string;
-  DEMO_USER_PRINCIPAL: string;
-  DEMO_PROCESSOR_PRINCIPAL: string;
 }>({
   schema: {
     type: "object",
@@ -30,8 +28,6 @@ const config = envSchema<{
       UNLEASH_URL: url,
       UNLEASH_ADMIN_USER: { type: "string", default: "admin" },
       UNLEASH_ADMIN_PASSWORD: { type: "string", default: "unleash4all" },
-      DEMO_USER_PRINCIPAL: { type: "string", default: "anna" },
-      DEMO_PROCESSOR_PRINCIPAL: { type: "string", default: "card-processor" },
     },
   },
 });
@@ -86,9 +82,7 @@ app.route({
   method: ["GET", "PUT"],
   url: "/bff/*",
   handler: (request, reply) =>
-    reply.from(request.url.replace(/^\/bff/, ""), {
-      rewriteRequestHeaders: (_request, headers) => ({ ...headers, authorization: `Bearer ${config.DEMO_USER_PRINCIPAL}` }),
-    }),
+    reply.from(request.url.replace(/^\/bff/, "")),
 });
 
 app.get("/flags", async () => {
@@ -122,7 +116,7 @@ app.post<{ Body: { cardId?: unknown; amount?: unknown; currency?: unknown; merch
     }
     const response = await fetch(`${config.CARD_API_URL}/cards/${encodeURIComponent(cardId)}/transactions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${config.DEMO_PROCESSOR_PRINCIPAL}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: { amount, currency },
         merchantName: typeof merchantName === "string" && merchantName ? merchantName : "Demo purchase",

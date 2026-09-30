@@ -1,11 +1,8 @@
 # Project name pinned: it would otherwise follow this file's directory (infra).
 name: qred
 
-# Mocked authentication (ADR 0003): bearer token -> demo principal, shared by every service.
-x-principals: &principals >-
-  {"anna": {"kind": "user", "userId": "00000000-0000-4000-a000-000000000001",
-            "memberships": ["00000000-0000-4000-a000-000000000101", "00000000-0000-4000-a000-000000000102"]},
-   "card-processor": {"kind": "client", "clientId": "card-processor", "scopes": ["transactions:write"]}}
+# Every service acts as this demo User (ADR 0006): Anna Lindqvist from the seeds.
+x-demo-user: &demo-user "00000000-0000-4000-a000-000000000001"
 
 x-app: &app
   restart: unless-stopped
@@ -41,7 +38,7 @@ services:
     environment:
       PORT: 3001
       DATABASE_URL: postgres://identity:identity@postgres:5432/identity
-      AUTH_PRINCIPALS: *principals
+      DEMO_USER_ID: *demo-user
     ports: ["3001:3001"]
     develop:
       watch:
@@ -58,7 +55,7 @@ services:
     environment:
       PORT: 3002
       DATABASE_URL: postgres://card:card@postgres:5432/card
-      AUTH_PRINCIPALS: *principals
+      DEMO_USER_ID: *demo-user
     ports: ["3002:3002"]
     develop:
       watch:
@@ -75,7 +72,7 @@ services:
     environment:
       PORT: 3003
       DATABASE_URL: postgres://billing:billing@postgres:5432/billing
-      AUTH_PRINCIPALS: *principals
+      DEMO_USER_ID: *demo-user
     ports: ["3003:3003"]
     develop:
       watch:
@@ -102,7 +99,7 @@ services:
       UNLEASH_URL: http://unleash:4242/api
       UNLEASH_TOKEN: default:development.unleash-insecure-backend-token
       UNLEASH_REFRESH_MS: 2000
-      AUTH_PRINCIPALS: *principals
+      DEMO_USER_ID: *demo-user
     ports: ["3000:3000"]
     develop:
       watch:

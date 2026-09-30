@@ -3,43 +3,30 @@ info:
   title: Identity API
   version: 0.1.0
   description: |
-    Owns Users, Companies and Memberships (ADR 0003).
+    Owns Users, Companies and Memberships. The signed-in User is a fixed
+    demo User injected by middleware (ADR 0006).
 
-    Authentication is mocked in this case: the bearer token is a demo
-    principal name (`anna`, `card-processor`) resolved from configuration
-    by every service. The target design, signed short-lived JWTs carrying
-    Membership claims, is described in ADR 0003.
-
-    Errors use `application/problem+json` (RFC 9457).
     Every path answers undeclared methods with `405 Method Not Allowed` and an
     `Allow` header, and rejects unknown query parameters with `400`.
 servers:
   - url: http://localhost:3001
     description: Local (docker compose)
+# No authentication: every request acts as the fixed demo User (ADR 0006).
+security: []
 
 paths:
   /me:
     get:
       operationId: getMe
       summary: The signed-in User and the Companies they are a member of
-      security:
-        - bearerAuth: []
       responses:
         "200":
           description: The User
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      description: Demo principal name; see the API description.
-
   schemas:
     Id:
       type: string
@@ -70,24 +57,3 @@ components:
       properties:
         id: { $ref: "#/components/schemas/Id" }
         name: { type: string }
-
-    Problem:
-      type: object
-      required: [type, title, status]
-      properties:
-        type: { type: string, format: uri-reference }
-        title: { type: string }
-        status: { type: integer }
-        detail: { type: string }
-
-  responses:
-    Unauthorized:
-      description: Missing or unknown principal.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
-    Forbidden:
-      description: The caller is a client principal, not a User.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }

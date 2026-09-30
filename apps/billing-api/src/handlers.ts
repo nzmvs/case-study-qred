@@ -10,9 +10,7 @@ type Invoice = components["schemas"]["Invoice"];
 export function billingHandlers({ db }: { db: Database }) {
   return {
     async listInvoices(request: FastifyRequest<{ Querystring: Query }>) {
-      const { principal } = request;
       const { companyId, status, limit = 20 } = request.query;
-      if (principal.kind !== "user" || !principal.memberships.includes(companyId)) return { items: [] };
 
       const now = new Date();
       const rows = await db

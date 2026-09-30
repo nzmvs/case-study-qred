@@ -13,8 +13,8 @@ info:
 servers:
   - url: http://localhost:3000
     description: Local (docker compose)
-security:
-  - bearerAuth: []
+# No authentication: every request acts as the fixed demo User (ADR 0006).
+security: []
 
 paths:
   /screens/card-overview:
@@ -52,7 +52,6 @@ paths:
                 activeCard: { $ref: "#/components/examples/ActiveCardScreen" }
                 inactiveCard: { $ref: "#/components/examples/InactiveCardScreen" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
@@ -98,7 +97,6 @@ paths:
               examples:
                 activated: { $ref: "#/components/examples/ActiveCardScreen" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "412": { $ref: "#/components/responses/PreconditionFailed" }
@@ -106,12 +104,6 @@ paths:
         "502": { $ref: "#/components/responses/BadGateway" }
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      description: Caller principal; a demo principal name in this case (ADR 0003).
-
   headers:
     QredDataSources:
       description: |
@@ -290,11 +282,6 @@ components:
   responses:
     BadRequest:
       description: The request is malformed.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
-    Unauthorized:
-      description: Missing or unknown principal.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }

@@ -13,8 +13,7 @@ export interface paths {
         };
         /**
          * A Company's Invoices, earliest due first
-         * @description Empty when the caller is not a member of the Company. Paying an
-         *     Invoice is out of scope.
+         * @description Paying an Invoice is out of scope.
          */
         get: operations["listInvoices"];
         put?: never;
@@ -87,15 +86,6 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description Missing or unknown principal. */
-        Unauthorized: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
     };
     parameters: never;
     requestBodies: never;
@@ -130,7 +120,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
         };
     };
 }

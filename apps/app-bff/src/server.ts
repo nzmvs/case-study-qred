@@ -1,4 +1,4 @@
-import { parsePrincipals, type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
+import { type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
 import envSchema from "env-schema";
 import { initialize } from "unleash-client";
 import { buildApp } from "./app.js";
@@ -67,7 +67,7 @@ const app = await buildApp({
       : null,
     flags,
   },
-  principals: parsePrincipals(config.AUTH_PRINCIPALS),
+  demoUserId: config.DEMO_USER_ID,
   timeoutMs: config.UPSTREAM_TIMEOUT_MS,
   ...(config.CONTRACT_PATH ? { contractPath: config.CONTRACT_PATH } : {}),
   logger: true,

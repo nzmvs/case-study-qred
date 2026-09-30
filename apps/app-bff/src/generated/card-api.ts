@@ -86,9 +86,7 @@ export interface paths {
         put?: never;
         /**
          * Record a Transaction authorised on a Card
-         * @description Called by the card processor when a purchase is authorised. Requires
-         *     a client principal with the `transactions:write` scope (the demo
-         *     principal `card-processor`); User principals are rejected with `403`. The
+         * @description Called by the card processor when a purchase is authorised. The
          *     Transaction starts `pending`. Rejected when the Card is not `active`
          *     or the amount exceeds the Card's Remaining spend in the Spend period
          *     (the UTC calendar month, ADR 0005) that contains `occurredAt`.
@@ -319,25 +317,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description Missing or unknown principal. */
-        Unauthorized: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
-        /** @description The caller's principal lacks the required scope. */
-        Forbidden: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
-        /** @description The Card does not exist or is not visible to the caller. */
+        /** @description The Card does not exist or is not the User's. */
         NotFound: {
             headers: {
                 [name: string]: unknown;
@@ -431,7 +411,7 @@ export interface operations {
         parameters: {
             query: {
                 companyId: components["schemas"]["Id"];
-                /** @description Only the caller's own Cards can be listed. */
+                /** @description Only the User's own Cards can be listed. */
                 holder: "me";
                 /** @description Comma-separated Card statuses to include; all when omitted. */
                 status?: components["schemas"]["CardStatus"][];
@@ -454,7 +434,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
         };
     };
     getCard: {
@@ -479,7 +458,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -528,7 +506,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["IllegalTransition"];
             412: components["responses"]["PreconditionFailed"];
@@ -561,7 +538,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -590,7 +566,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -629,8 +604,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["CardNotActive"];
             422: components["responses"]["Unprocessable"];

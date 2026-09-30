@@ -1,5 +1,7 @@
 # Membership travels in the access token
 
+Status: superseded by [ADR 0006](0006-fixed-demo-user.md) for this case; kept as the target design.
+
 The Identity API owns Memberships and issues signed JWTs whose claims list the Companies a User is a member of. The Card API and Billing API verify tokens with the Identity API's public key from configuration and authorise against the claims, never calling the Identity API at runtime. This keeps the Card API free of runtime dependencies at the cost of staleness: a revoked Membership stays valid until the token expires, bounded by a 5 minute token lifetime.
 
 ## Considered Options

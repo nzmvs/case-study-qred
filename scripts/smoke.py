@@ -17,8 +17,6 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
 CARD_API = os.environ.get("CARD_API_URL", "http://localhost:3002")
-ANNA = "Bearer anna"
-PROCESSOR = "Bearer card-processor"
 ACTIVE_CARD = "00000000-0000-4000-a000-000000000201"
 INACTIVE_CARD = "00000000-0000-4000-a000-000000000202"
 COMPANY_AB = "00000000-0000-4000-a000-000000000101"
@@ -34,10 +32,8 @@ class Response:
         return json.loads(self.body) if self.body else {}
 
 
-def request(method: str, path: str, auth: str | None = ANNA, body: dict | None = None, if_match: str | None = None) -> Response:
+def request(method: str, path: str, body: dict | None = None, if_match: str | None = None) -> Response:
     headers = {"Content-Type": "application/json"}
-    if auth:
-        headers["Authorization"] = auth
     if if_match:
         headers["If-Match"] = if_match
     data = json.dumps(body).encode() if body is not None else None
@@ -104,8 +100,6 @@ def main() -> int:
 
     check(200, "list cards", request("GET", f"/cards?companyId={COMPANY_AB}&holder=me&status=inactive,active,frozen"))
     check(200, "get card", request("GET", f"/cards/{ACTIVE_CARD}"))
-    check(401, "no principal", request("GET", f"/cards/{ACTIVE_CARD}", auth=None))
-    check(404, "processor cannot read", request("GET", f"/cards/{ACTIVE_CARD}", auth=PROCESSOR))
     spend = check(200, "spend", request("GET", f"/cards/{ACTIVE_CARD}/spend?from={period_start}&to={period_end}"))
     expect("spent 460000", spend.json().get("spent", {}).get("amount") == 460_000, spend.body)
     check(400, "spend bad range", request("GET", f"/cards/{ACTIVE_CARD}/spend?from={period_end}&to={period_start}"))
@@ -120,16 +114,15 @@ def main() -> int:
     illegal = check(409, "illegal transition", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("frozen"), if_match=stored))
     allowed = illegal.json().get("allowedTransitions")
     expect("allowedTransitions in 409", allowed == ["activate", "close"], illegal.body)
-    check(409, "charge inactive card", request("POST", f"/cards/{INACTIVE_CARD}/transactions", auth=PROCESSOR, body=purchase(100)))
+    check(409, "charge inactive card", request("POST", f"/cards/{INACTIVE_CARD}/transactions", body=purchase(100)))
     check(200, "activate", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("active"), if_match=stored))
     check(412, "old ETag after change", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("frozen"), if_match=stored))
     fresh = etag(INACTIVE_CARD)
     check(400, "close without reason", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("closed"), if_match=fresh))
 
-    check(403, "user records transaction", request("POST", f"/cards/{ACTIVE_CARD}/transactions", body=purchase(100)))
-    check(422, "wrong currency", request("POST", f"/cards/{ACTIVE_CARD}/transactions", auth=PROCESSOR, body=purchase(100, "EUR")))
-    check(422, "over the limit", request("POST", f"/cards/{ACTIVE_CARD}/transactions", auth=PROCESSOR, body=purchase(540_001)))
-    check(201, "exactly the limit", request("POST", f"/cards/{ACTIVE_CARD}/transactions", auth=PROCESSOR, body=purchase(540_000)))
+    check(422, "wrong currency", request("POST", f"/cards/{ACTIVE_CARD}/transactions", body=purchase(100, "EUR")))
+    check(422, "over the limit", request("POST", f"/cards/{ACTIVE_CARD}/transactions", body=purchase(540_001)))
+    check(201, "exactly the limit", request("POST", f"/cards/{ACTIVE_CARD}/transactions", body=purchase(540_000)))
 
     reseed()
     print(f"failures: {failures}")

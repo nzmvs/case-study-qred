@@ -4,8 +4,8 @@ info:
   version: 0.1.0
   description: |
     Owns Invoices: what a Company owes Qred. Depends on no other service at
-    runtime. A User may only see Invoices of Companies they are a member of,
-    as stated by the caller's principal (ADR 0003; mocked in this case).
+    runtime. Callers are trusted to ask only for their own Companies; the
+    App BFF checks this against the Identity API (ADR 0006).
 
     All money is in minor units (öre) with an ISO 4217 currency. Errors use
     `application/problem+json` (RFC 9457).
@@ -14,8 +14,8 @@ info:
 servers:
   - url: http://localhost:3003
     description: Local (docker compose)
-security:
-  - bearerAuth: []
+# No authentication: every request acts as the fixed demo User (ADR 0006).
+security: []
 
 paths:
   /invoices:
@@ -23,8 +23,7 @@ paths:
       operationId: listInvoices
       summary: A Company's Invoices, earliest due first
       description: |
-        Empty when the caller is not a member of the Company. Paying an
-        Invoice is out of scope.
+        Paying an Invoice is out of scope.
       parameters:
         - name: companyId
           in: query
@@ -59,15 +58,8 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Invoice" }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      description: Caller principal; a demo principal name in this case (ADR 0003).
-
   schemas:
     Id:
       type: string
@@ -126,11 +118,6 @@ components:
   responses:
     BadRequest:
       description: The request is malformed.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
-    Unauthorized:
-      description: Missing or unknown principal.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }

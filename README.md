@@ -14,10 +14,10 @@ pnpm down           # stop everything
 
 Without pnpm on the host: `docker compose -f infra/docker-compose.yml up --build`.
 
-Then ask the App BFF for the screen (`anna` is a demo principal, see [ADR 0003](docs/adr/0003-membership-in-access-token.md)):
+Then ask the App BFF for the screen. Every request acts as the demo User Anna ([ADR 0006](docs/adr/0006-fixed-demo-user.md)):
 
 ```sh
-curl -H 'Authorization: Bearer anna' localhost:3000/screens/card-overview
+curl localhost:3000/screens/card-overview
 ```
 
 Or open the demo harness at [localhost:3100](http://localhost:3100): a dev-only page that renders the Screen, switches each upstream between mock and real, activates or freezes the Card, and simulates purchases as the Card processor.
@@ -48,7 +48,7 @@ apps/
   billing-api/      /
   demo/             dev-only demo harness: one static page and a small server
 packages/
-  service-kit/      shared plumbing: contract-driven Fastify, auth seam, problem+json, Kysely
+  service-kit/      shared plumbing: contract-driven Fastify, demo identity, problem+json, Kysely
 contracts/          OpenAPI contracts, the source of truth for routes, validation and types
 infra/              Dockerfile, docker-compose.yml, Postgres init, Prism image, Unleash seed
 tests/contract/     Schemathesis configuration per service
@@ -77,4 +77,4 @@ The contract and smoke tests change data and reseed afterwards. Starting or rest
 
 - [CONTEXT.md](CONTEXT.md): the domain language used in code, contracts and docs
 - [NOTES.md](NOTES.md): known simplifications and what I would do with more time
-- [docs/adr](docs/adr): why the services are split, why PUT with If-Match, how auth is mocked, feature-flagged upstreams, UTC spend periods
+- [docs/adr](docs/adr): why the services are split, why PUT with If-Match, the fixed demo User, feature-flagged upstreams, UTC spend periods

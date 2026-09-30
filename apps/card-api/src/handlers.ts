@@ -8,7 +8,7 @@ import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-li
 import { spendPeriodOf } from "./domain/spend-period.js";
 import { TransactionStatus } from "./domain/transaction-status.js";
 import type { components, operations } from "./generated/card-api.js";
-import { httpErrors, type Principal } from "@qred/service-kit";
+import { httpErrors } from "@qred/service-kit";
 import { cardNotActive, cardNotFound, staleCard } from "./problems.js";
 
 type Op = keyof operations;
@@ -18,11 +18,10 @@ type Headers<K extends Op> = NonNullable<operations[K]["parameters"]["header"]>;
 type Body<K extends Op> = operations[K] extends { requestBody: { content: { "application/json": infer B } } } ? B : never;
 type Transaction = components["schemas"]["Transaction"];
 
-const TRANSACTIONS_WRITE = "transactions:write";
 const COUNTED_STATUSES = [TransactionStatus.Pending, TransactionStatus.Settled];
 
-function visibleTo(row: CardRow, principal: Principal): boolean {
-  return principal.kind === "user" && principal.memberships.includes(row.companyId) && row.holderUserId === principal.userId;
+function visibleTo(row: CardRow, userId: string): boolean {
+  return row.holderUserId === userId;
 }
 
 function toTransaction(row: Selectable<Transactions>): Transaction {
@@ -63,23 +62,21 @@ async function spentBetween(db: Database | DbTransaction<DB>, cardId: string, fr
 }
 
 export function cardHandlers({ db }: { db: Database }) {
-  async function findVisible(cardId: string, principal: Principal): Promise<CardRow> {
+  async function findVisible(cardId: string, userId: string): Promise<CardRow> {
     const row = await db.selectFrom("cards").selectAll().where("id", "=", cardId).executeTakeFirst();
-    if (!row || !visibleTo(row, principal)) throw cardNotFound();
+    if (!row || !visibleTo(row, userId)) throw cardNotFound();
     return row;
   }
 
   return {
     async listCards(request: FastifyRequest<{ Querystring: Query<"listCards"> }>) {
-      const { principal } = request;
       const { companyId, status } = request.query;
-      if (principal.kind !== "user" || !principal.memberships.includes(companyId)) return { items: [] };
 
       const rows = await db
         .selectFrom("cards")
         .selectAll()
         .where("companyId", "=", companyId)
-        .where("holderUserId", "=", principal.userId)
+        .where("holderUserId", "=", request.userId)
         .orderBy("createdAt", "desc")
         .execute();
       const now = new Date();
@@ -89,7 +86,7 @@ export function cardHandlers({ db }: { db: Database }) {
     },
 
     async getCard(request: FastifyRequest<{ Params: Path<"getCard"> }>, reply: FastifyReply) {
-      const card = toCard(await findVisible(request.params.cardId, request.principal), new Date());
+      const card = toCard(await findVisible(request.params.cardId, request.userId), new Date());
       reply.header("ETag", etagOf(card));
       return card;
     },
@@ -101,7 +98,7 @@ export function cardHandlers({ db }: { db: Database }) {
       const { settings, state } = request.body;
       return db.transaction().execute(async (tx) => {
         const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
-        if (!row || !visibleTo(row, request.principal)) throw cardNotFound();
+        if (!row || !visibleTo(row, request.userId)) throw cardNotFound();
 
         const now = new Date();
         const current = toCard(row, now);
@@ -139,7 +136,7 @@ export function cardHandlers({ db }: { db: Database }) {
     },
 
     async getCardSpend(request: FastifyRequest<{ Params: Path<"getCardSpend">; Querystring: Query<"getCardSpend"> }>) {
-      const row = await findVisible(request.params.cardId, request.principal);
+      const row = await findVisible(request.params.cardId, request.userId);
       const from = new Date(request.query.from);
       const to = new Date(request.query.to);
       if (to < from) throw httpErrors.badRequest("`to` must not be before `from`.");
@@ -151,7 +148,7 @@ export function cardHandlers({ db }: { db: Database }) {
     async listCardTransactions(
       request: FastifyRequest<{ Params: Path<"listCardTransactions">; Querystring: Query<"listCardTransactions"> }>,
     ) {
-      const row = await findVisible(request.params.cardId, request.principal);
+      const row = await findVisible(request.params.cardId, request.userId);
       const limit = request.query.limit ?? 20;
       const after = request.query.cursor ? decodeCursor(request.query.cursor) : undefined;
 
@@ -187,10 +184,6 @@ export function cardHandlers({ db }: { db: Database }) {
       request: FastifyRequest<{ Params: Path<"createCardTransaction">; Body: Body<"createCardTransaction"> }>,
       reply: FastifyReply,
     ) {
-      const { principal } = request;
-      if (principal.kind !== "client" || !principal.scopes.includes(TRANSACTIONS_WRITE)) {
-        throw httpErrors.forbidden(`Recording Transactions requires the ${TRANSACTIONS_WRITE} scope.`);
-      }
       const { amount, merchantName } = request.body;
       const occurredAt = new Date(request.body.occurredAt);
 
