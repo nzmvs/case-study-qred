@@ -80,9 +80,10 @@ paths:
       summary: Replace a Card's mutable state
       description: |
         Carries the full mutable representation of the Card (ADR 0002). A
-        change of `status` must be one of the Card's `allowedTransitions`.
-        The `ETag` is a hash of the Card's representation. A PUT that changes
-        nothing writes nothing and returns the same `ETag`.
+        changed `status` must be the `status` of one of the Card's
+        `allowedTransitions`. The `ETag` is a hash of the Card's
+        representation. A PUT that changes nothing writes nothing and returns
+        the same `ETag`.
       parameters:
         - $ref: "#/components/parameters/IfMatch"
       requestBody:
@@ -113,22 +114,11 @@ paths:
       - $ref: "#/components/parameters/CardId"
     get:
       operationId: getCardSpend
-      summary: What a Card spent in a time range
+      summary: Remaining spend in the current Spend period
       description: |
-        Sum of pending and settled Transactions with `occurredAt` in
-        [`from`, `to`). Reversed Transactions do not count. Callers decide
-        the range; the current Spend period is the UTC calendar month
-        (ADR 0005).
-      parameters:
-        - name: from
-          in: query
-          required: true
-          schema: { type: string, format: date-time }
-        - name: to
-          in: query
-          required: true
-          description: Exclusive; must not be before `from` (`400`). An empty range spends nothing.
-          schema: { type: string, format: date-time }
+        The Card's Spending limit, what it spent in the current Spend period
+        (the UTC calendar month, ADR 0005) and its Remaining spend. Pending
+        and settled Transactions count; reversed ones do not.
       responses:
         "200":
           description: The spend
@@ -271,7 +261,9 @@ components:
         state:
           status: active
           closedReason: null
-          allowedTransitions: [freeze, close]
+          allowedTransitions:
+            - { transition: freeze, status: frozen }
+            - { transition: close, status: closed }
 
     CardDetails:
       type: object
@@ -323,7 +315,16 @@ components:
         allowedTransitions:
           type: array
           description: Status changes allowed from the current status.
-          items: { $ref: "#/components/schemas/CardTransition" }
+          items: { $ref: "#/components/schemas/AllowedTransition" }
+
+    AllowedTransition:
+      type: object
+      required: [transition, status]
+      properties:
+        transition: { $ref: "#/components/schemas/CardTransition" }
+        status:
+          $ref: "#/components/schemas/CardStatus"
+          description: The `status` a PUT sends to make this transition.
 
     CardInput:
       type: object
@@ -337,8 +338,10 @@ components:
         state:
           type: object
           description: |
-            A changed `status` must be one of `allowedTransitions` (`409`
-            otherwise). `closedReason` is given exactly when closing.
+            A changed `status` must be the `status` of one of
+            `allowedTransitions` (`409` otherwise). `closedReason` is given
+            exactly when `status` is `closed`, and a closed Card keeps its
+            reason (`422`).
           required: [status, closedReason]
           additionalProperties: false
           properties:
@@ -356,15 +359,26 @@ components:
 
     Spend:
       type: object
-      required: [from, to, spent]
+      required: [periodStart, periodEnd, spendingLimit, spent, remaining]
       properties:
-        from: { type: string, format: date-time }
-        to: { type: string, format: date-time }
-        spent: { $ref: "#/components/schemas/Money" }
+        periodStart: { type: string, format: date-time }
+        periodEnd:
+          type: string
+          format: date-time
+          description: Exclusive.
+        spendingLimit: { $ref: "#/components/schemas/Money" }
+        spent:
+          $ref: "#/components/schemas/Money"
+          description: Pending and settled Transactions in the Spend period.
+        remaining:
+          $ref: "#/components/schemas/Money"
+          description: The Spending limit minus `spent`, never below zero.
       example:
-        from: "2026-09-01T00:00:00+02:00"
-        to: "2026-10-01T00:00:00+02:00"
+        periodStart: "2026-09-01T00:00:00Z"
+        periodEnd: "2026-10-01T00:00:00Z"
+        spendingLimit: { amount: 1000000, currency: SEK }
         spent: { amount: 460000, currency: SEK }
+        remaining: { amount: 540000, currency: SEK }
 
     TransactionStatus:
       type: string
@@ -457,7 +471,7 @@ components:
         allowedTransitions:
           type: array
           description: Present on an illegal transition.
-          items: { $ref: "#/components/schemas/CardTransition" }
+          items: { $ref: "#/components/schemas/AllowedTransition" }
 
   responses:
     BadRequest:
@@ -498,9 +512,9 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     Unprocessable:
       description: |
-        Well-formed but violates a domain rule: a missing or unexpected
-        `closedReason`, a non-positive amount, a currency mismatch, or the
-        Spending limit would be exceeded.
+        Well-formed but breaks a domain rule: changing a closed Card's
+        `closedReason`, a currency other than the Card's, or a Transaction
+        over the Remaining spend.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }

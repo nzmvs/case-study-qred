@@ -13,11 +13,7 @@ include-name = "POST /cards/{cardId}/transactions"
 # A currency other than the Card's, or a purchase over the Remaining spend, is a documented 422.
 checks = { positive_data_acceptance = { expected-statuses = ["201", "404", "409", "422"] } }
 
-# Rules OpenAPI cannot express, stated in the contract: a reversed range, and a cursor this API did not issue.
-[[operations]]
-include-name = "GET /cards/{cardId}/spend"
-checks = { positive_data_acceptance = { expected-statuses = ["200", "400", "404"] } }
-
+# A rule OpenAPI cannot express, stated in the contract: a cursor this API did not issue.
 [[operations]]
 include-name = "GET /cards/{cardId}/transactions"
 checks = { positive_data_acceptance = { expected-statuses = ["200", "400", "404"] } }

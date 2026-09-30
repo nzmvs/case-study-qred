@@ -62,9 +62,9 @@ paths:
       description: |
         Full representation of what the User may change on their Card, which
         today is only its status. Drives the "Activate card" button (and
-        freeze / unfreeze). Send the Card's `etag` from the Screen as
-        `If-Match`. Returns the refreshed card overview Screen, so the app
-        re-renders without a second call.
+        freeze / unfreeze): send the chosen action's `status` as the body and
+        the Card's `etag` from the Screen as `If-Match`. Returns the refreshed
+        card overview Screen, so the app re-renders without a second call.
       parameters:
         - name: cardId
           in: path
@@ -200,8 +200,16 @@ components:
           type: array
           description: Status changes the User can make now; drives which buttons show.
           items:
-            type: string
-            enum: [activate, freeze, unfreeze]
+            type: object
+            required: [action, status]
+            properties:
+              action:
+                type: string
+                enum: [activate, freeze, unfreeze]
+              status:
+                type: string
+                enum: [active, frozen]
+                description: The `status` to send as `CardInput` for this action.
 
     Spend:
       type: object
@@ -276,8 +284,13 @@ components:
         instance: { type: string }
         allowedTransitions:
           type: array
-          description: Present on `409`.
-          items: { type: string }
+          description: Present on `409`, as the Card API reports it.
+          items:
+            type: object
+            required: [transition, status]
+            properties:
+              transition: { type: string }
+              status: { type: string }
 
   responses:
     BadRequest:
@@ -333,13 +346,14 @@ components:
           expiry: 09/29
           holderName: Anna Lindqvist
           etag: '"c2a9f0"'
-          actions: [freeze]
+          actions:
+            - { action: freeze, status: frozen }
         spend:
           remaining: { amount: 540000, currency: SEK }
           spendingLimit: { amount: 1000000, currency: SEK }
           spent: { amount: 460000, currency: SEK }
-          periodStart: "2026-09-01T00:00:00+02:00"
-          periodEnd: "2026-10-01T00:00:00+02:00"
+          periodStart: "2026-09-01T00:00:00Z"
+          periodEnd: "2026-10-01T00:00:00Z"
         latestTransactions:
           items:
             - id: 00000000-0000-4000-a000-000000001057
@@ -380,13 +394,14 @@ components:
           expiry: 08/30
           holderName: Anna Lindqvist
           etag: '"91be07"'
-          actions: [activate]
+          actions:
+            - { action: activate, status: active }
         spend:
           remaining: { amount: 2500000, currency: SEK }
           spendingLimit: { amount: 2500000, currency: SEK }
           spent: { amount: 0, currency: SEK }
-          periodStart: "2026-09-01T00:00:00+02:00"
-          periodEnd: "2026-10-01T00:00:00+02:00"
+          periodStart: "2026-09-01T00:00:00Z"
+          periodEnd: "2026-10-01T00:00:00Z"
         latestTransactions:
           items: []
           totalCount: 0

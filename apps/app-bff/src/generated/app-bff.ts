@@ -47,9 +47,9 @@ export interface paths {
          * Replace the User-editable state of the User's Card
          * @description Full representation of what the User may change on their Card, which
          *     today is only its status. Drives the "Activate card" button (and
-         *     freeze / unfreeze). Send the Card's `etag` from the Screen as
-         *     `If-Match`. Returns the refreshed card overview Screen, so the app
-         *     re-renders without a second call.
+         *     freeze / unfreeze): send the chosen action's `status` as the body and
+         *     the Card's `etag` from the Screen as `If-Match`. Returns the refreshed
+         *     card overview Screen, so the app re-renders without a second call.
          */
         put: operations["putCard"];
         post?: never;
@@ -110,7 +110,15 @@ export interface components {
             /** @description Send as `If-Match` when changing this Card. */
             etag: string;
             /** @description Status changes the User can make now; drives which buttons show. */
-            actions: ("activate" | "freeze" | "unfreeze")[];
+            actions: {
+                /** @enum {string} */
+                action: "activate" | "freeze" | "unfreeze";
+                /**
+                 * @description The `status` to send as `CardInput` for this action.
+                 * @enum {string}
+                 */
+                status: "active" | "frozen";
+            }[];
         };
         Spend: {
             remaining: components["schemas"]["Money"];
@@ -159,8 +167,11 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Present on `409`. */
-            allowedTransitions?: string[];
+            /** @description Present on `409`, as the Card API reports it. */
+            allowedTransitions?: {
+                transition: string;
+                status: string;
+            }[];
         };
     };
     responses: {

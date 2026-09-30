@@ -4,6 +4,8 @@ import {
   allowedTransitions,
   CardStatus,
   CardTransition,
+  checkClosedReason,
+  ClosedReasonChange,
   effectiveStatus,
   IllegalTransition,
   resolveTransition,
@@ -44,18 +46,44 @@ describe("resolveTransition", () => {
       assert.fail("expected IllegalTransition");
     } catch (error) {
       assert.ok(error instanceof IllegalTransition);
-      assert.deepEqual(error.allowed, [Freeze, Close]);
+      assert.deepEqual(error.allowed, [
+        { transition: Freeze, status: Frozen },
+        { transition: Close, status: Closed },
+      ]);
     }
   });
 });
 
 describe("allowedTransitions", () => {
-  it("matches the transition table", () => {
-    assert.deepEqual(allowedTransitions(Inactive), [Activate, Close]);
-    assert.deepEqual(allowedTransitions(Active), [Freeze, Close]);
-    assert.deepEqual(allowedTransitions(Frozen), [Unfreeze, Close]);
+  it("pairs each allowed transition with the status that makes it", () => {
+    assert.deepEqual(allowedTransitions(Inactive), [
+      { transition: Activate, status: Active },
+      { transition: Close, status: Closed },
+    ]);
+    assert.deepEqual(allowedTransitions(Active), [
+      { transition: Freeze, status: Frozen },
+      { transition: Close, status: Closed },
+    ]);
+    assert.deepEqual(allowedTransitions(Frozen), [
+      { transition: Unfreeze, status: Active },
+      { transition: Close, status: Closed },
+    ]);
     assert.deepEqual(allowedTransitions(Closed), []);
     assert.deepEqual(allowedTransitions(Expired), []);
+  });
+});
+
+describe("checkClosedReason", () => {
+  it("accepts a closed Card's own reason", () => {
+    assert.doesNotThrow(() => checkClosedReason({ status: Closed, closedReason: "lost" }, "lost"));
+  });
+
+  it("refuses a different reason for a closed Card", () => {
+    assert.throws(() => checkClosedReason({ status: Closed, closedReason: "lost" }, "stolen"), ClosedReasonChange);
+  });
+
+  it("lets a Card that is not closed take a reason as it closes", () => {
+    assert.doesNotThrow(() => checkClosedReason({ status: Active, closedReason: null }, "stolen"));
   });
 });
 

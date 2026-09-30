@@ -82,13 +82,6 @@ def now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def spend_period() -> tuple[str, str]:
-    """The current UTC Spend period (ADR 0005)."""
-    today = datetime.now(timezone.utc)
-    year, month = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
-    return f"{today:%Y-%m}-01T00:00:00Z", f"{year:04d}-{month:02d}-01T00:00:00Z"
-
-
 def reseed() -> None:
     compose = ["docker", "compose", "-f", str(ROOT / "infra/docker-compose.yml")]
     subprocess.run([*compose, "exec", "-T", "card-api", "pnpm", "--filter", "@qred/card-api", "db:seed"], check=True, capture_output=True)
@@ -96,13 +89,12 @@ def reseed() -> None:
 
 def main() -> int:
     reseed()
-    period_start, period_end = spend_period()
 
     check(200, "list cards", request("GET", f"/cards?companyId={COMPANY_AB}&holder=me&status=inactive,active,frozen"))
     check(200, "get card", request("GET", f"/cards/{ACTIVE_CARD}"))
-    spend = check(200, "spend", request("GET", f"/cards/{ACTIVE_CARD}/spend?from={period_start}&to={period_end}"))
+    spend = check(200, "spend", request("GET", f"/cards/{ACTIVE_CARD}/spend"))
     expect("spent 460000", spend.json().get("spent", {}).get("amount") == 460_000, spend.body)
-    check(400, "spend bad range", request("GET", f"/cards/{ACTIVE_CARD}/spend?from={period_end}&to={period_start}"))
+    expect("remaining 540000", spend.json().get("remaining", {}).get("amount") == 540_000, spend.body)
     page = check(200, "transactions page", request("GET", f"/cards/{ACTIVE_CARD}/transactions?limit=3"))
     expect("totalCount 57", page.json().get("totalCount") == 57, page.body)
     unknown = check(404, "unknown route", request("GET", "/nope"))
@@ -116,12 +108,15 @@ def main() -> int:
     check(400, "put with details", request("PUT", f"/cards/{INACTIVE_CARD}", body=with_details, if_match=stored))
     illegal = check(409, "illegal transition", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("frozen"), if_match=stored))
     allowed = illegal.json().get("allowedTransitions")
-    expect("allowedTransitions in 409", allowed == ["activate", "close"], illegal.body)
+    expected = [{"transition": "activate", "status": "active"}, {"transition": "close", "status": "closed"}]
+    expect("allowedTransitions in 409", allowed == expected, illegal.body)
     check(409, "charge inactive card", request("POST", f"/cards/{INACTIVE_CARD}/transactions", body=purchase(100)))
     check(200, "activate", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("active"), if_match=stored))
     check(412, "old ETag after change", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("frozen"), if_match=stored))
     fresh = etag(INACTIVE_CARD)
     check(400, "close without reason", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("closed"), if_match=fresh))
+    check(200, "close", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("closed", "lost"), if_match=fresh))
+    check(422, "change closedReason", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("closed", "stolen"), if_match=etag(INACTIVE_CARD)))
 
     check(422, "wrong currency", request("POST", f"/cards/{ACTIVE_CARD}/transactions", body=purchase(100, "EUR")))
     check(422, "over the limit", request("POST", f"/cards/{ACTIVE_CARD}/transactions", body=purchase(540_001)))

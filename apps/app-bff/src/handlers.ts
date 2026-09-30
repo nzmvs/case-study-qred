@@ -1,7 +1,7 @@
 import { httpErrors } from "@qred/service-kit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { operations } from "./generated/app-bff.js";
-import { assembleCardOverview, type CardOverviewScreen, currentSpendPeriod } from "./screen.js";
+import { assembleCardOverview, type CardOverviewScreen } from "./screen.js";
 import { describeSources, type Routing, route } from "./sources.js";
 import { badGateway, forwardProblem, optional, required, type Upstreams } from "./upstreams.js";
 
@@ -49,21 +49,15 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
       }),
     );
     const cardId = found.items[0]?.id;
-    const period = currentSpendPeriod(new Date());
 
     if (!cardId) {
-      return assembleCardOverview({ me, selectedCompanyId, card: null, spend: null, transactions: null, invoices: await invoices, period });
+      return assembleCardOverview({ me, selectedCompanyId, card: null, spend: null, transactions: null, invoices: await invoices });
     }
 
     const path = { path: { cardId } };
     const [cardResult, spend, transactions] = await Promise.all([
       required("Card API", card.GET("/cards/{cardId}", { params: path, ...call() })),
-      optional(
-        card.GET("/cards/{cardId}/spend", {
-          params: { ...path, query: { from: period.start.toISOString(), to: period.end.toISOString() } },
-          ...call(),
-        }),
-      ),
+      optional(card.GET("/cards/{cardId}/spend", { params: path, ...call() })),
       optional(card.GET("/cards/{cardId}/transactions", { params: { ...path, query: { limit: 3 } }, ...call() })),
     ]);
     const etag = cardResult.response.headers.get("etag");
@@ -72,11 +66,10 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
     return assembleCardOverview({
       me,
       selectedCompanyId,
-      card: { card: cardResult.data, etag },
+      card: { data: cardResult.data, etag },
       spend,
       transactions,
       invoices: await invoices,
-      period,
     });
   }
 

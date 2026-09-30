@@ -118,7 +118,6 @@
 
 <script>
 const UPSTREAMS = ["identity", "card", "billing"];
-const TRANSITION_TARGET = { activate: "active", freeze: "frozen", unfreeze: "active" };
 const ACTION_LABEL = { activate: "Activate card", freeze: "Freeze card", unfreeze: "Unfreeze card" };
 const FLAG_PROPAGATION_MS = 2500;
 
@@ -215,7 +214,7 @@ function render() {
     .map((c) => `<option value="${esc(c.id)}" ${c.id === companySwitcher.selectedCompanyId ? "selected" : ""}>${esc(c.name)}</option>`)
     .join("");
   const actions = card
-    ? card.actions.map((a) => `<button data-action="${esc(a)}">${esc(ACTION_LABEL[a] ?? a)}</button>`).join("")
+    ? card.actions.map((a) => `<button data-status="${esc(a.status)}">${esc(ACTION_LABEL[a.action] ?? a.action)}</button>`).join("")
     : "";
   $("phone").innerHTML = `
     <div class="topbar"><span>qred.</span><span>Menu</span></div>
@@ -224,16 +223,16 @@ function render() {
     ${card ? renderCard(card) + renderSpend() + renderTransactions() : '<div class="box empty">No card issued in this company</div>'}
     <div class="actions">${actions}<button class="secondary" disabled>Contact Qred's support</button></div>`;
   $("company").addEventListener("change", (e) => { companyId = e.target.value; loadScreen(); });
-  for (const button of $("phone").querySelectorAll("[data-action]")) {
-    button.addEventListener("click", () => changeCard(button.dataset.action));
+  for (const button of $("phone").querySelectorAll("[data-status]")) {
+    button.addEventListener("click", () => changeCard(button.dataset.status));
   }
 }
 
-async function changeCard(action) {
+async function changeCard(status) {
   received(await call(`/bff/cards/${encodeURIComponent(screen.card.id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", "If-Match": screen.card.etag },
-    body: JSON.stringify({ status: TRANSITION_TARGET[action] }),
+    body: JSON.stringify({ status }),
   }));
 }
 

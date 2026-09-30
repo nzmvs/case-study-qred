@@ -3,8 +3,9 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { type Kysely, type Selectable, sql, type Transaction as DbTransaction } from "kysely";
 import { type CardRow, etagOf, toCard } from "./cards/representation.js";
 import type { DB, Transactions } from "./db/types.js";
-import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
+import { CardStatus, checkClosedReason, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
 import { spendPeriodOf } from "./domain/spend-period.js";
+import { checkSpendingLimit, COUNTED_STATUSES, remainingSpend } from "./domain/spending-limit.js";
 import { TransactionStatus } from "./domain/transaction-status.js";
 import type { components, operations } from "./generated/card-api.js";
 import { httpErrors } from "@qred/service-kit";
@@ -16,8 +17,6 @@ type Query<K extends Op> = NonNullable<operations[K]["parameters"]["query"]>;
 type Headers<K extends Op> = NonNullable<operations[K]["parameters"]["header"]>;
 type Body<K extends Op> = operations[K] extends { requestBody: { content: { "application/json": infer B } } } ? B : never;
 type Transaction = components["schemas"]["Transaction"];
-
-const COUNTED_STATUSES = [TransactionStatus.Pending, TransactionStatus.Settled];
 
 function visibleTo(row: CardRow, userId: string): boolean {
   return row.holderUserId === userId;
@@ -105,12 +104,7 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
         if (request.headers["if-match"] !== etagOf(current)) throw staleCard();
 
         const transition = resolveTransition(current.state.status, state.status);
-        if (state.status === CardStatus.Closed) {
-          if (!state.closedReason) throw httpErrors.unprocessableEntity("closedReason is required when closing a card.");
-          if (!transition && state.closedReason !== row.closedReason) throw httpErrors.unprocessableEntity("A closed card's closedReason cannot change.");
-        } else if (state.closedReason !== null) {
-          throw httpErrors.unprocessableEntity("closedReason must be null unless the card is closed.");
-        }
+        checkClosedReason(current.state, state.closedReason);
 
         if (!transition && settings.spendingLimit === row.spendingLimit) {
           reply.header("ETag", etagOf(current));
@@ -134,14 +128,18 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
       });
     },
 
-    async getCardSpend(request: FastifyRequest<{ Params: Path<"getCardSpend">; Querystring: Query<"getCardSpend"> }>) {
+    async getCardSpend(request: FastifyRequest<{ Params: Path<"getCardSpend"> }>) {
       const row = await findVisible(request.params.cardId, request.userId);
-      const from = new Date(request.query.from);
-      const to = new Date(request.query.to);
-      if (to < from) throw httpErrors.badRequest("`to` must not be before `from`.");
-
-      const spent = await spentBetween(db, row.id, from, to);
-      return { from: request.query.from, to: request.query.to, spent: { amount: spent, currency: row.currency } };
+      const period = spendPeriodOf(new Date());
+      const spent = await spentBetween(db, row.id, period.start, period.end);
+      const money = (amount: number) => ({ amount, currency: row.currency });
+      return {
+        periodStart: period.start.toISOString(),
+        periodEnd: period.end.toISOString(),
+        spendingLimit: money(row.spendingLimit),
+        spent: money(spent),
+        remaining: money(remainingSpend(row.spendingLimit, spent)),
+      };
     },
 
     async listCardTransactions(
@@ -193,14 +191,11 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
 
         const status = effectiveStatus(row.status as CardStatus, row.expiresAt, new Date());
         if (status !== CardStatus.Active) throw cardNotActive(status);
-        if (amount.amount <= 0) throw httpErrors.unprocessableEntity("amount must be positive.");
         if (amount.currency !== row.currency) throw httpErrors.unprocessableEntity(`The Card spends in ${row.currency}, not ${amount.currency}.`);
 
         const period = spendPeriodOf(occurredAt);
         const spent = await spentBetween(tx, row.id, period.start, period.end);
-        if (spent + amount.amount > row.spendingLimit) {
-          throw httpErrors.unprocessableEntity(`The purchase exceeds the Remaining spend of ${Math.max(0, row.spendingLimit - spent)} for this Spend period.`);
-        }
+        checkSpendingLimit(amount.amount, row.spendingLimit, spent);
 
         return tx
           .insertInto("transactions")

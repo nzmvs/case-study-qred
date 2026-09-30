@@ -35,9 +35,10 @@ export interface paths {
         /**
          * Replace a Card's mutable state
          * @description Carries the full mutable representation of the Card (ADR 0002). A
-         *     change of `status` must be one of the Card's `allowedTransitions`.
-         *     The `ETag` is a hash of the Card's representation. A PUT that changes
-         *     nothing writes nothing and returns the same `ETag`.
+         *     changed `status` must be the `status` of one of the Card's
+         *     `allowedTransitions`. The `ETag` is a hash of the Card's
+         *     representation. A PUT that changes nothing writes nothing and returns
+         *     the same `ETag`.
          */
         put: operations["putCard"];
         post?: never;
@@ -57,11 +58,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * What a Card spent in a time range
-         * @description Sum of pending and settled Transactions with `occurredAt` in
-         *     [`from`, `to`). Reversed Transactions do not count. Callers decide
-         *     the range; the current Spend period is the UTC calendar month
-         *     (ADR 0005).
+         * Remaining spend in the current Spend period
+         * @description The Card's Spending limit, what it spent in the current Spend period
+         *     (the UTC calendar month, ADR 0005) and its Remaining spend. Pending
+         *     and settled Transactions count; reversed ones do not.
          */
         get: operations["getCardSpend"];
         put?: never;
@@ -137,8 +137,14 @@ export interface components {
          *         "status": "active",
          *         "closedReason": null,
          *         "allowedTransitions": [
-         *           "freeze",
-         *           "close"
+         *           {
+         *             "transition": "freeze",
+         *             "status": "frozen"
+         *           },
+         *           {
+         *             "transition": "close",
+         *             "status": "closed"
+         *           }
          *         ]
          *       }
          *     }
@@ -181,7 +187,12 @@ export interface components {
             status: components["schemas"]["CardStatus"];
             closedReason: components["schemas"]["ClosedReason"] | null;
             /** @description Status changes allowed from the current status. */
-            allowedTransitions: components["schemas"]["CardTransition"][];
+            allowedTransitions: components["schemas"]["AllowedTransition"][];
+        };
+        AllowedTransition: {
+            transition: components["schemas"]["CardTransition"];
+            /** @description The `status` a PUT sends to make this transition. */
+            status: components["schemas"]["CardStatus"];
         };
         /**
          * @description The mutable part of a Card: `settings` and `state` without the derived
@@ -190,8 +201,10 @@ export interface components {
         CardInput: {
             settings: components["schemas"]["CardSettings"];
             /**
-             * @description A changed `status` must be one of `allowedTransitions` (`409`
-             *     otherwise). `closedReason` is given exactly when closing.
+             * @description A changed `status` must be the `status` of one of
+             *     `allowedTransitions` (`409` otherwise). `closedReason` is given
+             *     exactly when `status` is `closed`, and a closed Card keeps its
+             *     reason (`422`).
              */
             state: {
                 status: components["schemas"]["CardStatus"];
@@ -200,20 +213,35 @@ export interface components {
         };
         /**
          * @example {
-         *       "from": "2026-09-01T00:00:00+02:00",
-         *       "to": "2026-10-01T00:00:00+02:00",
+         *       "periodStart": "2026-09-01T00:00:00Z",
+         *       "periodEnd": "2026-10-01T00:00:00Z",
+         *       "spendingLimit": {
+         *         "amount": 1000000,
+         *         "currency": "SEK"
+         *       },
          *       "spent": {
          *         "amount": 460000,
+         *         "currency": "SEK"
+         *       },
+         *       "remaining": {
+         *         "amount": 540000,
          *         "currency": "SEK"
          *       }
          *     }
          */
         Spend: {
             /** Format: date-time */
-            from: string;
-            /** Format: date-time */
-            to: string;
+            periodStart: string;
+            /**
+             * Format: date-time
+             * @description Exclusive.
+             */
+            periodEnd: string;
+            spendingLimit: components["schemas"]["Money"];
+            /** @description Pending and settled Transactions in the Spend period. */
             spent: components["schemas"]["Money"];
+            /** @description The Spending limit minus `spent`, never below zero. */
+            remaining: components["schemas"]["Money"];
         };
         /** @enum {string} */
         TransactionStatus: "pending" | "settled" | "reversed";
@@ -304,7 +332,7 @@ export interface components {
             detail?: string;
             instance?: string;
             /** @description Present on an illegal transition. */
-            allowedTransitions?: components["schemas"]["CardTransition"][];
+            allowedTransitions?: components["schemas"]["AllowedTransition"][];
         };
     };
     responses: {
@@ -372,9 +400,9 @@ export interface components {
             };
         };
         /**
-         * @description Well-formed but violates a domain rule: a missing or unexpected
-         *     `closedReason`, a non-positive amount, a currency mismatch, or the
-         *     Spending limit would be exceeded.
+         * @description Well-formed but breaks a domain rule: changing a closed Card's
+         *     `closedReason`, a currency other than the Card's, or a Transaction
+         *     over the Remaining spend.
          */
         Unprocessable: {
             headers: {
@@ -515,11 +543,7 @@ export interface operations {
     };
     getCardSpend: {
         parameters: {
-            query: {
-                from: string;
-                /** @description Exclusive; must not be before `from` (`400`). An empty range spends nothing. */
-                to: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 cardId: components["parameters"]["CardId"];
