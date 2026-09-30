@@ -1,5 +1,4 @@
-import { sql } from "kysely";
-import type { Kysely } from "kysely";
+import { type Kysely, sql } from "kysely";
 import type { DB } from "../types.js";
 import { CardStatus } from "../../domain/card-lifecycle.js";
 import { spendPeriodOf } from "../../domain/spend-period.js";
@@ -55,7 +54,6 @@ function companyAbTransactions(now: Date): SeedTransaction[] {
   return [...previous, ...current];
 }
 
-/** kysely-ctl seed: resets this service's demo data on every run. */
 export async function seed(db: Kysely<DB>): Promise<void> {
   await sql`TRUNCATE transactions, cards`.execute(db);
   await insertDemoData(db, new Date());

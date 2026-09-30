@@ -81,8 +81,7 @@ await app.register(replyFrom, { base: config.APP_BFF_URL });
 app.route({
   method: ["GET", "PUT"],
   url: "/bff/*",
-  handler: (request, reply) =>
-    reply.from(request.url.replace(/^\/bff/, "")),
+  handler: (request, reply) => reply.from(request.url.replace(/^\/bff/, "")),
 });
 
 app.get("/flags", async () => {

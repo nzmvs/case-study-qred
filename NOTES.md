@@ -30,7 +30,7 @@ These are deliberate and visible in the running system.
 
 - **Identity events.** `MembershipGranted`, `MembershipRevoked` and `CompanyUpdated` published by the Identity API and projected locally by the Card and Billing APIs, through an outbox so no event is lost. This removes the token-lifetime staleness from ADR 0003 and gives the Card API Company time zones for local Spend periods.
 - **Transaction events.** `TransactionRecorded` and `TransactionSettled` feeding Billing, so Invoices follow spend.
-- **Real authentication** as in [ADR 0003](docs/adr/0003-membership-in-access-token.md): an OIDC provider with the authorisation code flow and PKCE for the app, client credentials for the processor, and short-lived JWTs carrying Membership claims. The identity middleware (`packages/service-kit/src/identity.ts`) would set `request.userId` from the verified token, and the Membership and processor-scope checks come back.
+- **Real authentication** as in [ADR 0003](docs/adr/0003-membership-in-access-token.md): an OIDC provider with the authorisation code flow and PKCE for the app, client credentials for the processor, and short-lived JWTs carrying Membership claims. The identity middleware (`packages/service-kit/src/plugins/demo-identity.ts`) would set `request.userId` from the verified token, and the Membership and processor-scope checks come back.
 
 ## App BFF and contracts
 
@@ -39,7 +39,7 @@ These are deliberate and visible in the running system.
 - **Per-Company flag rollout.** The Card change would need the Company in its request (or a lookup first) so reads and writes always route to the same source.
 - **Resilience per upstream.** Timeouts tuned per upstream, and a circuit breaker so a failing upstream is not called on every request.
 - **Conditional GET on Screens.** `@fastify/etag` in the App BFF would give each Screen an ETag and answer `304` when the app already has it, saving mobile bandwidth.
-- **Effect in the App BFF.** Composing upstreams with timeouts and partial failure is what Effect is built for; worth trying there if that logic grows.
+- **Effect in the App BFF.** Composing upstreams with timeouts and partial failure is what Effect is built for; worth trying there if that logic grows. A smaller step would be `neverthrow`'s `Result` for the optional sections, which today use a one-line `Section` type.
 - **Card numbers.** Showing the full number or CVV belongs in the Card processor's secure view (PCI DSS), so it never passes through Qred's backend.
 - **Flag hygiene.** Each `bff-*-api-real` flag is removed from code once its service is live for everyone.
 
@@ -57,7 +57,6 @@ These are deliberate and visible in the running system.
 - **Edge concerns.** Rate limiting, request size limits and security headers at the gateway; CORS only where a browser client needs it.
 
 ## Tooling observations
-
 
 - The official `stoplight/prism` image crashes on startup, so the mocks run the Prism npm package (`infra/prism`).
 - The Prism mocks answer a missing `If-Match` with a generic validation error (`400` for the App BFF, `422` for the Card API); the real services answer `428` as the contracts say.

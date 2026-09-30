@@ -11,4 +11,4 @@ The Identity API owns Memberships and issues signed JWTs whose claims list the C
 
 ## In this case
 
-Token issuance and verification are mocked: every service resolves the bearer token as a demo principal name (`anna`, `card-processor`) from shared configuration into the same `Principal` the JWT verification would produce. Membership and scope checks run against that `Principal` unchanged, so replacing the mock with JWT verification touches only `packages/service-kit/src/auth.ts`.
+Not implemented: authentication is out of scope, and every request acts as a fixed demo User ([ADR 0006](0006-fixed-demo-user.md)). This ADR stays as the design a real deployment would follow.

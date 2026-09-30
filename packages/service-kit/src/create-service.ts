@@ -1,6 +1,6 @@
 import { Ajv, type Options as AjvOptions } from "ajv";
 import addFormats from "ajv-formats";
-import Fastify, { type FastifyServerOptions } from "fastify";
+import Fastify from "fastify";
 import qs from "qs";
 
 /**
@@ -27,9 +27,9 @@ function lowercaseHeaders(schema: { properties?: Record<string, unknown>; requir
 }
 
 /** A Fastify instance with the settings that cannot live in a plugin: query parsing, validation, body parsers. */
-export function createService({ logger = true }: { logger?: FastifyServerOptions["logger"] } = {}) {
+export function createService() {
   const app = Fastify({
-    logger,
+    logger: true,
     // The contracts' array query parameters use `style: form, explode: false`: `?status=a,b`.
     routerOptions: { querystringParser: (query) => qs.parse(query, { comma: true }) },
   });

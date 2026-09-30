@@ -1,6 +1,5 @@
 import type { FastifyRequest } from "fastify";
-import type { Expression, SqlBool } from "kysely";
-import type { Kysely } from "kysely";
+import type { Expression, Kysely, SqlBool } from "kysely";
 import type { DB } from "./db/types.js";
 import { effectiveStatus, InvoiceStatus, type StoredInvoiceStatus } from "./domain/invoice-status.js";
 import type { components, operations } from "./generated/billing-api.js";

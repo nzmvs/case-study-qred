@@ -1,5 +1,5 @@
-import { sql } from "kysely";
-import type { Kysely } from "kysely";
+import { type Kysely, sql } from "kysely";
+import { InvoiceStatus, type StoredInvoiceStatus } from "../../domain/invoice-status.js";
 import type { DB } from "../types.js";
 
 // Fixed ids shared with the other services' seeds and the contract examples.
@@ -19,7 +19,6 @@ function localMidnight(date: string): Date {
 
 const isoDate = (year: number, monthIndex: number, day: number) => new Date(Date.UTC(year, monthIndex, day)).toISOString().slice(0, 10);
 
-/** kysely-ctl seed: resets this service's demo data on every run. */
 export async function seed(db: Kysely<DB>): Promise<void> {
   await sql`TRUNCATE invoices`.execute(db);
   await insertDemoData(db, new Date());
@@ -28,7 +27,7 @@ export async function seed(db: Kysely<DB>): Promise<void> {
 /** Company AB: last month's Invoice paid, this month's due on the 15th of next month. Nordic Trading has none. */
 async function insertDemoData(db: Kysely<DB>, now: Date): Promise<void> {
   const [y, m] = [now.getUTCFullYear(), now.getUTCMonth()];
-  const invoice = (id: string, monthOffset: number, amount: number, status: "open" | "paid") => {
+  const invoice = (id: string, monthOffset: number, amount: number, status: StoredInvoiceStatus) => {
     const dueDate = isoDate(y, m + monthOffset + 1, 15);
     return {
       id,
@@ -43,6 +42,6 @@ async function insertDemoData(db: Kysely<DB>, now: Date): Promise<void> {
   };
   await db
     .insertInto("invoices")
-    .values([invoice(PAID_INVOICE, -1, 987_500, "paid"), invoice(OPEN_INVOICE, 0, 1_249_000, "open")])
+    .values([invoice(PAID_INVOICE, -1, 987_500, InvoiceStatus.Paid), invoice(OPEN_INVOICE, 0, 1_249_000, InvoiceStatus.Open)])
     .execute();
 }

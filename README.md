@@ -71,7 +71,7 @@ CONTEXT.md          domain glossary
 | `pnpm logs` | follows the stack's logs |
 | `pnpm compose ...` | any other `docker compose` command for this stack |
 
-The contract and smoke tests change data and reseed afterwards. Starting or restarting a service also reseeds its demo data.
+The contract and smoke tests change data and reseed afterwards. In the dev stack, starting or restarting a service also reseeds its demo data.
 
 ## Further reading
 
