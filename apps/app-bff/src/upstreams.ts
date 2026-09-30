@@ -13,7 +13,6 @@ export type Upstreams = {
 
 export type UpstreamUrls = { identity: string; card: string; billing: string };
 
-// The contracts' array query parameters are comma-separated: ?status=a,b
 const querySerializer = { array: { style: "form", explode: false } } as const;
 
 export function createUpstreams(urls: UpstreamUrls): Upstreams {
@@ -26,10 +25,8 @@ export function createUpstreams(urls: UpstreamUrls): Upstreams {
 
 type FetchResult<T> = { data?: T; error?: unknown; response: Response };
 
-// A 5xx hides its message by default; which upstream failed is useful to the app and leaks nothing.
 export const badGateway = (detail: string) => httpErrors.createError(502, detail, { expose: true });
 
-/** The upstream's answer; its problem re-raised for a status in `forwarded`, otherwise any failure is 502. */
 export async function required<T>(
   name: string,
   request: Promise<FetchResult<T>>,
@@ -55,7 +52,6 @@ export async function optional<T>(request: Promise<FetchResult<T>>): Promise<Sec
   }
 }
 
-/** Re-raise an upstream RFC 9457 problem unchanged, e.g. the Card API's 409 with allowedTransitions. */
 function forwardProblem(status: number, body: unknown): HttpError {
   const { type, title, detail, status: _status, ...extensions } = (body ?? {}) as Record<string, unknown>;
   return httpErrors.createError(status, typeof detail === "string" ? detail : "", {

@@ -4,7 +4,6 @@ import { CardStatus } from "../../domain/card-lifecycle.js";
 import { spendPeriodOf } from "../../domain/spend-period.js";
 import { TransactionStatus } from "../../domain/transaction-status.js";
 
-// Fixed ids shared with the other services' seeds and the contract examples.
 const ANNA = "00000000-0000-4000-a000-000000000001";
 const COMPANY_AB = "00000000-0000-4000-a000-000000000101";
 const NORDIC_TRADING = "00000000-0000-4000-a000-000000000102";
@@ -17,11 +16,6 @@ const transactionId = (n: number) => `00000000-0000-4000-a000-${String(1000 + n)
 
 type SeedTransaction = { amount: number; merchantName: string; occurredAt: Date; status: TransactionStatus };
 
-/**
- * 57 Transactions on the Company AB Card: 30 settled last month, 27 this month of which one is
- * reversed. This month's pending and settled spend is exactly 4 600 kr, so Remaining spend is
- * 5 400 / 10 000 kr. Dates are relative to `now` so the demo shows current spend whenever it runs.
- */
 function companyAbTransactions(now: Date): SeedTransaction[] {
   const thisMonth = spendPeriodOf(now).start;
   const lastMonth = spendPeriodOf(now, -1).start;

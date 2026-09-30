@@ -16,7 +16,6 @@ const { Activate, Freeze, Unfreeze, Close } = CardTransition;
 const NONE = null;
 const ILLEGAL = IllegalTransition;
 
-// Every (current, requested) pair: the transition it resolves to, NONE for no change, ILLEGAL otherwise.
 const EXPECTED: Record<CardStatus, Record<CardStatus, CardTransition | typeof NONE | typeof ILLEGAL>> = {
   [Inactive]: { [Inactive]: NONE, [Active]: Activate, [Frozen]: ILLEGAL, [Closed]: Close, [Expired]: ILLEGAL },
   [Active]: { [Inactive]: ILLEGAL, [Active]: NONE, [Frozen]: Freeze, [Closed]: Close, [Expired]: ILLEGAL },

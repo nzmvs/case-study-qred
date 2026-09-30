@@ -7,7 +7,6 @@ export type CardOverviewScreen = Bff["schemas"]["CardOverviewScreen"];
 type CardSummary = Bff["schemas"]["CardSummary"];
 type UnavailableSection = CardOverviewScreen["unavailable"][number];
 
-/** An optional section's upstream result: the data, or `unavailable` when its request failed. */
 export type Section<T> = { ok: true; value: T } | { ok: false };
 
 export type CardOverviewInputs = {
@@ -31,14 +30,12 @@ function toCardSummary({ data: card, etag }: NonNullable<CardOverviewInputs["car
     expiry: `${String(month).padStart(2, "0")}/${String(year % 100).padStart(2, "0")}`,
     holderName,
     etag,
-    // The Screen offers only what a Cardholder does from the app; closing is not one of them.
     actions: card.state.allowedTransitions
       .filter(({ transition }) => SCREEN_ACTIONS.includes(transition))
       .map(({ transition, status }) => ({ action: transition, status })) as CardSummary["actions"],
   };
 }
 
-/** Pure shaping of upstream data into the Screen; no I/O, no domain rules beyond presentation. */
 export function assembleCardOverview(inputs: CardOverviewInputs): CardOverviewScreen {
   const { me, selectedCompanyId, card, spend, transactions, invoices } = inputs;
   const unavailable: UnavailableSection[] = [];

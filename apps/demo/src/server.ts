@@ -1,7 +1,3 @@
-/**
- * Dev-only demo harness: serves the demo page, proxies its calls to the App BFF, toggles the BFF's
- * upstream flags in Unleash, and records purchases as the Card processor would. Never deployed.
- */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +34,6 @@ type Upstream = (typeof UPSTREAMS)[number];
 const flagName = (upstream: Upstream) => `bff-${upstream}-api-real`;
 const isUpstream = (value: string): value is Upstream => (UPSTREAMS as readonly string[]).includes(value);
 
-/** Unleash has no startup admin token, so the harness signs in as the admin and reuses the session. */
 let unleashSession: string | undefined;
 
 async function signIn(): Promise<string> {
@@ -76,7 +71,6 @@ app.get("/health", async () => ({ status: "ok" }));
 
 app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(await readFile(PAGE)));
 
-// The page talks to the real App BFF through here: same origin, and the BFF needs no CORS.
 await app.register(replyFrom, { base: config.APP_BFF_URL });
 app.route({
   method: ["GET", "PUT"],
@@ -105,7 +99,6 @@ app.put<{ Params: { upstream: string }; Body: { real?: unknown } }>("/flags/:ups
   return reply.code(response.ok ? 204 : 502).send();
 });
 
-// Stands in for the Card processor: records an authorised purchase on the real Card API.
 app.post<{ Body: { cardId?: unknown; amount?: unknown; currency?: unknown; merchantName?: unknown } }>(
   "/purchases",
   async (request, reply) => {

@@ -34,7 +34,6 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
       throw httpErrors.notFound("The Company does not exist or the User is not a member of it.");
     }
 
-    // Independent of the Card, so it runs while the Card is being found.
     const invoices = optional(
       billing.GET("/invoices", {
         params: { query: { companyId: selectedCompanyId, status: [...DUE_INVOICE_STATUSES], limit: 1 } },
@@ -86,8 +85,6 @@ export function bffHandlers({ routing, timeoutMs }: { routing: Routing; timeoutM
 
       const { data: current } = await required("Card API", card.GET("/cards/{cardId}", { params: path, ...call() }), CARD_NOT_FOUND);
 
-      // Full representation (ADR 0002): the Screen changes only the status; settings are sent back as read.
-      // The client's If-Match still guards them, so a concurrent change to the limit fails with 412.
       await required(
         "Card API",
         card.PUT("/cards/{cardId}", {

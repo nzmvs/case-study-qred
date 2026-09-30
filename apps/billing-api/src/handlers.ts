@@ -17,7 +17,6 @@ export function billingHandlers({ db }: { db: Kysely<DB> }) {
         .selectFrom("invoices")
         .selectAll()
         .where("companyId", "=", companyId)
-        // Overdue is derived, so each requested status becomes its stored condition.
         .$if(status !== undefined, (q) =>
           q.where((eb) => {
             const conditions: Record<InvoiceStatus, Expression<SqlBool>> = {

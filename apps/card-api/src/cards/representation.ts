@@ -30,7 +30,6 @@ export function toCard(row: CardRow, now: Date): Card {
   };
 }
 
-/** Strong ETag over the Card's representation, so it changes exactly when what a client sees changes. */
 export function etagOf(card: Card): string {
   return `"${createHash("sha256").update(canonicalize(card)!).digest("base64url").slice(0, 16)}"`;
 }

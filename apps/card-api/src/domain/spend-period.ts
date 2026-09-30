@@ -1,4 +1,3 @@
-/** The Spend period containing `instant`: its UTC calendar month, [start, end) (ADR 0005). */
 export function spendPeriodOf(instant: Date, monthOffset = 0): { start: Date; end: Date } {
   const year = instant.getUTCFullYear();
   const month = instant.getUTCMonth() + monthOffset;

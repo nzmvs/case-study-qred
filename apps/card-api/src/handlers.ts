@@ -78,7 +78,6 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
         .orderBy("createdAt", "desc")
         .execute();
       const now = new Date();
-      // Filter after mapping: expired is derived, so the stored status cannot be filtered in SQL.
       const cards = rows.map((row) => toCard(row, now));
       return { items: status ? cards.filter((card) => status.includes(card.state.status)) : cards };
     },
@@ -100,7 +99,6 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
 
         const now = new Date();
         const current = toCard(row, now);
-        // `*` is refused on purpose: it would skip the ETag check that stops lost updates (ADR 0002).
         if (request.headers["if-match"] !== etagOf(current)) throw staleCard();
 
         const transition = resolveTransition(current.state.status, state.status);
@@ -114,7 +112,6 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
         const updated = await tx
           .updateTable("cards")
           .set({
-            // Without a transition the stored status stays, even when the effective status is expired.
             ...(transition ? { status: state.status, closedReason: state.closedReason } : {}),
             spendingLimit: settings.spendingLimit,
             updatedAt: now,
@@ -184,7 +181,6 @@ export function cardHandlers({ db }: { db: Kysely<DB> }) {
       const { amount, merchantName } = request.body;
       const occurredAt = new Date(request.body.occurredAt);
 
-      // The Card row lock serialises purchases on one Card, so concurrent ones cannot jointly exceed the limit.
       const created = await db.transaction().execute(async (tx) => {
         const row = await tx.selectFrom("cards").selectAll().where("id", "=", request.params.cardId).forUpdate().executeTakeFirst();
         if (!row) throw cardNotFound();

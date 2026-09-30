@@ -1,7 +1,6 @@
 import type { Kysely } from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {
-  // listCards filters statuses after reading (expired is derived), so the partial unique index never applies.
   await db.schema
     .createIndex("cards_company_holder_idx")
     .on("cards")

@@ -23,7 +23,6 @@ const config = loadServiceConfig<{
     CARD_API_URL: url,
     BILLING_API_URL: url,
     UPSTREAM_TIMEOUT_MS: { type: "integer", default: 1000 },
-    // Mock clients are only created where the environment allows them; production never sets this.
     UPSTREAM_MOCKS_ALLOWED: { type: "boolean", default: false },
     IDENTITY_API_MOCK_URL: url,
     CARD_API_MOCK_URL: url,
@@ -60,7 +59,6 @@ const routing = {
   flags,
 };
 
-// Order matters: hooks and the error handler only apply to routes registered after them.
 const app = createService();
 await app.register(problemJson);
 await app.register(demoIdentity, { userId: config.DEMO_USER_ID });

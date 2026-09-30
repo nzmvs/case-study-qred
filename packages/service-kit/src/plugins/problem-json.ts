@@ -5,15 +5,10 @@ import fp from "fastify-plugin";
 
 const PROBLEM_BASE = "https://api.qred.example/problems";
 
-/**
- * Properties an HttpError may carry beyond http-errors' own: `problemType` and `title` override the
- * status-derived defaults; any other own property becomes an RFC 9457 extension member.
- */
 export type ProblemFields = { problemType?: string; title?: string; headers?: Record<string, string>; [extension: string]: unknown };
 
 const NOT_EXTENSIONS = new Set(["status", "statusCode", "expose", "headers", "message", "problemType", "title"]);
 
-/** Maps a service's own error types (e.g. domain errors) to HttpErrors; `undefined` falls through. */
 export type ErrorMapper = (error: unknown) => HttpError | undefined;
 
 const slug = (status: number) => (STATUS_CODES[status] ?? "error").toLowerCase().replace(/[^a-z]+/g, "-");
@@ -27,12 +22,10 @@ function isMissingIfMatch(error: FastifyError): boolean {
 
 function fromFastify(error: FastifyError, request: FastifyRequest): HttpError {
   if (error.validation) {
-    // Contracts mark If-Match as required; RFC 6585 names its absence 428, not 400.
     return isMissingIfMatch(error)
       ? httpErrors.preconditionRequired("Send the resource's ETag as If-Match.")
       : httpErrors.badRequest(error.message);
   }
-  // Fastify's own client errors (malformed JSON, a forbidden __proto__ key, a bad Content-Length...).
   if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
     return httpErrors.createError(error.statusCode, error.message);
   }

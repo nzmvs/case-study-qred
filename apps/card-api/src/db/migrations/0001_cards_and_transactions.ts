@@ -12,7 +12,6 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("expires_at", "timestamptz", (c) => c.notNull())
     .addColumn("currency", "char(3)", (c) => c.notNull())
     .addColumn("spending_limit", "bigint", (c) => c.notNull().check(sql`spending_limit >= 0`))
-    // Expired is derived from expires_at on read and never stored.
     .addColumn("status", "text", (c) =>
       c.notNull().check(sql`status IN ('inactive', 'active', 'frozen', 'closed')`),
     )
@@ -42,7 +41,6 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("created_at", "timestamptz", (c) => c.notNull().defaultTo(sql`now()`))
     .execute();
 
-  // Serves both the spend sum (index-only scan per card and range) and newest-first paging.
   await sql`
     CREATE INDEX transactions_card_occurred_idx
     ON transactions (card_id, occurred_at, id) INCLUDE (amount, status)

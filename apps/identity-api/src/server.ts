@@ -8,7 +8,6 @@ const config = loadServiceConfig<{ DATABASE_URL: string }>({
 });
 const db = createDatabase<DB>(config.DATABASE_URL);
 
-// Order matters: hooks and the error handler only apply to routes registered after them.
 const app = createService();
 await app.register(problemJson);
 await app.register(demoIdentity, { userId: config.DEMO_USER_ID });

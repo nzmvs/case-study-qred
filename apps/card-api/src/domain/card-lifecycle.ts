@@ -27,7 +27,6 @@ const TRANSITIONS = {
 
 const TERMINAL: readonly CardStatus[] = [CardStatus.Closed, CardStatus.Expired];
 
-/** A transition and the status a PUT sends to make it. */
 export type AllowedTransition = { transition: CardTransition; status: CardStatus };
 
 export class IllegalTransition extends Error {

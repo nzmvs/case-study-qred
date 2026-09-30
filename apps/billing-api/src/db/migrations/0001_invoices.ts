@@ -8,9 +8,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("amount", "bigint", (c) => c.notNull().check(sql`amount > 0`))
     .addColumn("currency", "char(3)", (c) => c.notNull())
     .addColumn("due_date", "date", (c) => c.notNull())
-    // End of due_date in the Company's time zone, fixed when the Invoice is issued.
     .addColumn("due_at", "timestamptz", (c) => c.notNull())
-    // Overdue is derived from due_at on read and never stored.
     .addColumn("status", "text", (c) => c.notNull().check(sql`status IN ('open', 'paid')`))
     .addColumn("issued_at", "timestamptz", (c) => c.notNull())
     .execute();
