@@ -17,10 +17,10 @@ These are deliberate and visible in the running system.
 ## Domain
 
 - **Roles on Membership.** Admin and Member, with only Admins setting Spending limits, and optionally a per-Card ceiling below which Members adjust their own limit.
-- **Company Credit limit.** Card limits can overcommit the Company's credit. Remaining spend would become the lower of the Card's and the Company's, with a `limitedBy` field so the Screen can say "based on company credit" instead of "your set limit".
+- **Company Credit limit.** Spending limits can overcommit the Company's credit. Remaining spend would become the lower of the Card's and the Company's, with a `limitedBy` field so the Screen can say "based on company credit" instead of "your set limit".
 - **Card issuing and Replacement.** `POST /cards`, with `last4` and expiry from the Card processor, and a Replacement flow for lost, stolen and expired Cards.
 - **A nightly expiry job** that persists `expired` as a status. Reads keep deriving it for exactness, but queries and a proper "one Card that is neither closed nor expired" index become possible.
-- **Transaction lifecycle.** The processor settling and reversing Transactions (`PUT /transactions/{id}`), and idempotency keys on `POST` so a retried authorisation is not recorded twice.
+- **Transaction lifecycle.** The processor settling and reversing Transactions (`PUT /transactions/{id}`), and idempotency keys on `POST` so a retried Transaction is not recorded twice.
 - **Transitions as resources** (`POST /cards/{id}/activations`) once transitions need their own input or an audit trail ([ADR 0002](docs/adr/0002-put-with-if-match-no-patch.md) names this as the upgrade path). A Card event history comes with it.
 - **Several Cards per Cardholder per Company.** The Screen would carry `cards[]`, added next to the current endpoint so nothing breaks.
 - **Invoices generated from Transactions**, paid through a payment provider, with `paid` as a real transition.
@@ -36,6 +36,7 @@ These are deliberate and visible in the running system.
 
 - **The Transactions Screen** behind "54 more items": `GET /screens/transactions?cardId&cursor`, contract first, on top of the Card API's existing cursor pagination.
 - **`GET /me/companies`** once a second Screen needs the Company switcher.
+- **Support contact on the Screen.** "Contact Qred's support" needs no data today: the app opens support directly. Contact details or opening hours that vary by market would become a `support` section.
 - **Per-Company flag rollout.** The Card change would need the Company in its request (or a lookup first) so reads and writes always route to the same source.
 - **Resilience per upstream.** Timeouts tuned per upstream, and a circuit breaker so a failing upstream is not called on every request.
 - **Conditional GET on Screens.** `@fastify/etag` in the App BFF would give each Screen an ETag and answer `304` when the app already has it, saving mobile bandwidth.
@@ -46,7 +47,7 @@ These are deliberate and visible in the running system.
 ## Testing
 
 - **Integration tests in code.** The smoke scenario as `node:test` tests with `app.inject` against Postgres, each run in its own throwaway schema, including the concurrent-purchase case.
-- **Query plans under load.** A bulk seed (about 100 000 Transactions across many Cards) and `EXPLAIN ANALYZE` showing the spend query as an index-only scan, then a load test of the Screen.
+- **Query plans under load.** `EXPLAIN` on the seed puts every Screen query on an index ([README](README.md#schema-and-payload-design)). A bulk seed (about 100 000 Transactions across many Cards) and `EXPLAIN ANALYZE` would confirm the planner keeps those plans at volume, then a load test of the Screen.
 - **CI.** Contract lint, unit tests, contract tests against the compose stack, and breaking-change detection on every contract change (for example `oasdiff`), with CODEOWNERS per contract so the owning team reviews it.
 - **Consumer checks.** The mobile app's expectations of the App BFF expressed as consumer-driven contract tests.
 

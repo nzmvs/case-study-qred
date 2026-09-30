@@ -24,15 +24,45 @@ Or open the demo harness at [localhost:3100](http://localhost:3100): a dev-only 
 
 A fresh stack serves every upstream from its contract mock. Open Unleash at [localhost:4242](http://localhost:4242) (`admin` / `unleash4all`) and turn on `bff-identity-api-real`, `bff-card-api-real` or `bff-billing-api-real` to switch that upstream to the real service. The response header `Qred-Data-Sources` shows which served it ([ADR 0004](docs/adr/0004-flagged-upstream-sources-in-bff.md)).
 
+The Card API mock answers every Company with the same example Card and keeps no changes, so turn on `bff-card-api-real` before activating, freezing or simulating purchases. Demo data is seeded relative to the current date whenever a service starts, and Remaining spend counts the current UTC month: after a month boundary, run `pnpm db:reset`.
+
 ## Where the case lives
 
 | The case asks for | Where it is |
 |---|---|
 | Database schema | `apps/*/src/db/migrations/`: one Postgres database per service |
 | Payload response for the screen | [contracts/app-bff.yaml](contracts/app-bff.yaml): `GET /screens/card-overview` returns the whole screen in one payload |
+| How both are optimised for the frontend and the backend | [Schema and payload design](#schema-and-payload-design) below |
 | API structure | the App BFF over three domain services, each with its own contract ([ADR 0001](docs/adr/0001-card-api-and-bff-split.md)) |
 | Code implementation | `apps/` and `packages/service-kit/`, described below |
 | Notes on further work | [NOTES.md](NOTES.md) |
+
+## Schema and payload design
+
+**The payload is shaped for the view.** `GET /screens/card-overview` returns everything the view renders, so the app needs one round trip at launch, and `PUT /cards/{cardId}` answers with the refreshed Screen, so a change needs no second call.
+
+- Remaining spend comes with its limit and Spend period, ready for "5 400/10 000 kr". The Card API computes it, so neither the BFF nor the app repeats the rule.
+- The Card comes as printed (`last4`, `expiry` as MM/YY, `holderName`), with the `etag` to send as `If-Match` and the `actions` the User can take now, each with the `status` to send. The app never needs the Card lifecycle.
+- The three latest Transactions come with `moreCount` for "54 more items", and the next Invoice due comes as one object or `null`.
+- Money is minor units with its currency; the app formats it.
+- An optional section whose upstream fails is `null` and listed in `unavailable`, so the Screen still renders and the app can tell "loading" from "none".
+
+**The BFF waits on as few round trips as the data allows.** After `/me`, the Invoice lookup runs while the Card is found; the Card, its spend and its Transactions then load in parallel. Every upstream call has a timeout (1 s by default).
+
+**Every query behind the Screen uses an index.** Each service has its own Postgres database.
+
+| Query | Index | Plan |
+|---|---|---|
+| the User's Card in a Company | `cards (company_id, holder_user_id, created_at)` | index scan, no sort |
+| spend in the Spend period | `transactions (card_id, occurred_at, id) INCLUDE (amount, status)` | index-only scan |
+| latest Transactions, paged on `(occurred_at, id)` | the same index | index scan, no sort |
+| next Invoice due | `invoices (company_id, due_date)` | index scan |
+
+The plans are from `EXPLAIN` on the seed data with sequential scans disabled, since the demo tables fit in one page; confirming them at volume is in [NOTES.md](NOTES.md). The rest of the schema keeps rules in Postgres and state exact:
+
+- Money is `bigint` minor units, statuses are `text` with `CHECK` constraints, and a partial unique index allows one open Card per Cardholder and Company.
+- `expired` and `overdue` are derived on read from `expires_at` and `due_at`, so they are exact without a background job.
+- Recording a Transaction locks its Card row, so concurrent Transactions cannot jointly exceed the Spending limit.
 
 ## Stack
 
@@ -129,7 +159,7 @@ apps/card-api/
   src/
     server.ts          config, database, the request pipeline, listen
     handlers.ts        one function per operationId in contracts/card-api.yaml
-    domain/            pure rules with unit tests: card lifecycle, spend period, statuses
+    domain/            pure rules with unit tests: card lifecycle, spend period, spending limit, statuses
     cards/             the Card representation served by the API and its ETag
     problems.ts        the service's own error types as problem+json
     db/
@@ -155,7 +185,7 @@ A request goes through them like this:
 2. `contract` matches the route from the OpenAPI file and validates path, query, headers and body against it. Anything the contract does not allow is `400` (or `405`, `415`, `428`) before a handler runs.
 3. The handler named after the `operationId` does the work, calling the pure `domain/` functions and Kysely.
 4. The response is serialised against the contract's response schema.
-5. Any thrown error is turned into problem+json by `problemJson`.
+5. Any thrown error, and any request for an unknown route, is turned into problem+json by `problemJson`.
 
 Adding an endpoint follows the same order: write it in the contract, run `pnpm gen`, add a handler with the operation's `operationId`, then `pnpm test:contract` checks the result against the contract.
 

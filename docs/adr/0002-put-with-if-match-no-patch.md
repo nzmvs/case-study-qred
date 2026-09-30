@@ -1,6 +1,6 @@
 # Change resources with PUT and If-Match, never PATCH
 
-Card changes, including state transitions, are made with `PUT /cards/{id}` carrying the full mutable representation; the server derives the transition by comparing current and requested status and rejects illegal ones with `409`. We chose PUT over PATCH for its idempotency (safe retries on mobile networks) and a single, complete representation to validate. PUT's lost-update risk is closed by requiring `If-Match` with the resource's `ETag` (`428` when missing, `412` when stale).
+Card changes, including status transitions, are made with `PUT /cards/{id}` carrying the full mutable representation; the server derives the transition by comparing current and requested status and rejects illegal ones with `409`. We chose PUT over PATCH for its idempotency (safe retries on mobile networks) and a single, complete representation to validate. PUT's lost-update risk is closed by requiring `If-Match` with the resource's `ETag` (`428` when missing, `412` when stale).
 
 ## Considered Options
 
