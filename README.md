@@ -57,6 +57,47 @@ docs/adr/           architecture decisions
 CONTEXT.md          domain glossary
 ```
 
+## How a service is structured
+
+Every domain service has the same shape; the Card API as an example:
+
+```
+apps/card-api/
+  src/
+    server.ts          config, database, the request pipeline, listen
+    handlers.ts        one function per operationId in contracts/card-api.yaml
+    domain/            pure rules with unit tests: card lifecycle, spend period, statuses
+    cards/             the Card representation served by the API and its ETag
+    problems.ts        the service's own error types as problem+json
+    db/
+      migrations/      schema changes, run by kysely-ctl
+      seeds/demo.ts    demo data, reset on every start
+      types.ts         generated from the migrated database (kysely-codegen)
+    generated/         TypeScript types generated from the contract (pnpm gen)
+  kysely.config.ts     kysely-ctl setup, shared from the service kit
+```
+
+`server.ts` reads as the request pipeline, in the order the plugins apply:
+
+```ts
+const app = createService();                                   // query parsing, validators, JSON bodies, /health
+await app.register(problemJson, { mapError: mapCardError });   // every error leaves as RFC 9457 problem+json
+await app.register(demoIdentity, { userId: config.DEMO_USER_ID }); // request.userId: the demo User (ADR 0006)
+await app.register(contract, { path: contractPath("card-api"), handlers: cardHandlers({ db }) });
+```
+
+A request goes through them like this:
+
+1. `demoIdentity` sets `request.userId`.
+2. `contract` matches the route from the OpenAPI file and validates path, query, headers and body against it. Anything the contract does not allow is `400` (or `405`, `415`, `428`) before a handler runs.
+3. The handler named after the `operationId` does the work, calling the pure `domain/` functions and Kysely.
+4. The response is serialised against the contract's response schema.
+5. Any thrown error is turned into problem+json by `problemJson`.
+
+Adding an endpoint follows the same order: write it in the contract, run `pnpm gen`, add a handler with the operation's `operationId`, then `pnpm test:contract` checks the result against the contract.
+
+The App BFF has the same pipeline but no database: `upstreams.ts` holds typed clients for the three domain services, `sources.ts` decides per upstream whether the mock or the real service answers (ADR 0004), and `screen.ts` shapes their data into the Screen.
+
 ## Scripts
 
 | Script | Does |
