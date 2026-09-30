@@ -1,5 +1,6 @@
 import { sql } from "kysely";
-import type { Database } from "../database.js";
+import type { Kysely } from "kysely";
+import type { DB } from "../types.js";
 import { CardStatus } from "../../domain/card-lifecycle.js";
 import { spendPeriodOf } from "../../domain/spend-period.js";
 import { TransactionStatus } from "../../domain/transaction-status.js";
@@ -55,12 +56,12 @@ function companyAbTransactions(now: Date): SeedTransaction[] {
 }
 
 /** kysely-ctl seed: resets this service's demo data on every run. */
-export async function seed(db: Database): Promise<void> {
+export async function seed(db: Kysely<DB>): Promise<void> {
   await sql`TRUNCATE transactions, cards`.execute(db);
   await insertDemoData(db, new Date());
 }
 
-async function insertDemoData(db: Database, now: Date): Promise<void> {
+async function insertDemoData(db: Kysely<DB>, now: Date): Promise<void> {
   await db.transaction().execute(async (tx) => {
     await tx
       .insertInto("cards")

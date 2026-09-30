@@ -1,13 +1,14 @@
 import type { FastifyRequest } from "fastify";
 import type { Expression, SqlBool } from "kysely";
-import type { Database } from "./db/database.js";
+import type { Kysely } from "kysely";
+import type { DB } from "./db/types.js";
 import { effectiveStatus, InvoiceStatus, type StoredInvoiceStatus } from "./domain/invoice-status.js";
 import type { components, operations } from "./generated/billing-api.js";
 
 type Query = NonNullable<operations["listInvoices"]["parameters"]["query"]>;
 type Invoice = components["schemas"]["Invoice"];
 
-export function billingHandlers({ db }: { db: Database }) {
+export function billingHandlers({ db }: { db: Kysely<DB> }) {
   return {
     async listInvoices(request: FastifyRequest<{ Querystring: Query }>) {
       const { companyId, status, limit = 20 } = request.query;

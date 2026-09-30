@@ -1,6 +1,7 @@
 import { STATUS_CODES } from "node:http";
 import { HttpError, httpErrors } from "@fastify/sensible";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
+import fp from "fastify-plugin";
 
 const PROBLEM_BASE = "https://api.qred.example/problems";
 
@@ -57,3 +58,7 @@ export function problemHandler(mapError: ErrorMapper = () => undefined) {
       });
   };
 }
+
+export const problemJson = fp<{ mapError?: ErrorMapper }>(async (app, { mapError }) => {
+  app.setErrorHandler(problemHandler(mapError));
+});

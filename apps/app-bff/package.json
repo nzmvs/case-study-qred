@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@qred/service-kit": "workspace:*",
-    "env-schema": "^8.0.0",
     "fastify": "^5.12.5",
     "openapi-fetch": "^0.17.0",
     "unleash-client": "^6.12.2"

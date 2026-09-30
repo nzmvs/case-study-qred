@@ -1,5 +1,7 @@
-export { type ServiceEnv, serviceEnv, serviceEnvRequired } from "./config.js";
-export { createDatabase } from "./database.js";
 export { HttpError, httpErrors } from "@fastify/sensible";
-export { type ErrorMapper, type ProblemFields, problemHandler } from "./problems.js";
-export { buildService } from "./service.js";
+export { loadServiceConfig, type ServiceEnv } from "./config.js";
+export { createService } from "./create-service.js";
+export { createDatabase } from "./database.js";
+export { contract, contractPath } from "./plugins/contract.js";
+export { demoIdentity } from "./plugins/demo-identity.js";
+export { type ErrorMapper, type ProblemFields, problemHandler, problemJson } from "./plugins/problem-json.js";

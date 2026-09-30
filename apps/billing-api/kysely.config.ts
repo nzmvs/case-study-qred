@@ -1,10 +1,3 @@
-import { CamelCasePlugin, PostgresDialect } from "kysely";
-import { defineConfig } from "kysely-ctl";
-import pg from "pg";
+import { kyselyConfig } from "@qred/service-kit/kysely-config";
 
-export default defineConfig({
-  dialect: new PostgresDialect({ pool: new pg.Pool({ connectionString: process.env.DATABASE_URL }) }),
-  plugins: [new CamelCasePlugin()],
-  migrations: { migrationFolder: "src/db/migrations" },
-  seeds: { seedFolder: "src/db/seeds" },
-});
+export default kyselyConfig();

@@ -48,7 +48,7 @@ apps/
   billing-api/      /
   demo/             dev-only demo harness: one static page and a small server
 packages/
-  service-kit/      shared plumbing: contract-driven Fastify, demo identity, problem+json, Kysely
+  service-kit/      createService() plus the request pipeline as plugins: problemJson, demoIdentity, contract
 contracts/          OpenAPI contracts, the source of truth for routes, validation and types
 infra/              Dockerfile, docker-compose.yml, Postgres init, Prism image, Unleash seed
 tests/contract/     Schemathesis configuration per service

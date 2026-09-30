@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { type Selectable, sql, type Transaction as DbTransaction } from "kysely";
+import { type Kysely, type Selectable, sql, type Transaction as DbTransaction } from "kysely";
 import { type CardRow, etagOf, toCard } from "./cards/representation.js";
-import type { Database } from "./db/database.js";
 import type { DB, Transactions } from "./db/types.js";
 import { CardStatus, effectiveStatus, resolveTransition } from "./domain/card-lifecycle.js";
 import { spendPeriodOf } from "./domain/spend-period.js";
@@ -49,7 +48,7 @@ function decodeCursor(cursor: string): [Date, string] {
   }
 }
 
-async function spentBetween(db: Database | DbTransaction<DB>, cardId: string, from: Date, to: Date): Promise<number> {
+async function spentBetween(db: Kysely<DB> | DbTransaction<DB>, cardId: string, from: Date, to: Date): Promise<number> {
   const { spent } = await db
     .selectFrom("transactions")
     .select(sql<number>`coalesce(sum(amount), 0)::int8`.as("spent"))
@@ -61,7 +60,7 @@ async function spentBetween(db: Database | DbTransaction<DB>, cardId: string, fr
   return spent;
 }
 
-export function cardHandlers({ db }: { db: Database }) {
+export function cardHandlers({ db }: { db: Kysely<DB> }) {
   async function findVisible(cardId: string, userId: string): Promise<CardRow> {
     const row = await db.selectFrom("cards").selectAll().where("id", "=", cardId).executeTakeFirst();
     if (!row || !visibleTo(row, userId)) throw cardNotFound();

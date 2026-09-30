@@ -1,11 +1,11 @@
-import { type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
-import envSchema from "env-schema";
+import { contract, contractPath, createService, demoIdentity, loadServiceConfig, problemJson } from "@qred/service-kit";
 import { initialize } from "unleash-client";
-import { buildApp } from "./app.js";
+import { bffHandlers } from "./handlers.js";
 import { type SourceFlags, unleashFlags } from "./sources.js";
 import { createUpstreams } from "./upstreams.js";
 
-type Config = ServiceEnv & {
+const url = { type: "string", minLength: 1 } as const;
+const config = loadServiceConfig<{
   IDENTITY_API_URL: string;
   CARD_API_URL: string;
   BILLING_API_URL: string;
@@ -17,32 +17,25 @@ type Config = ServiceEnv & {
   UNLEASH_URL?: string;
   UNLEASH_TOKEN?: string;
   UNLEASH_REFRESH_MS: number;
-};
-
-const url = { type: "string", minLength: 1 } as const;
-const config = envSchema<Config>({
-  schema: {
-    type: "object",
-    required: [...serviceEnvRequired, "IDENTITY_API_URL", "CARD_API_URL", "BILLING_API_URL"],
-    properties: {
-      ...serviceEnv,
-      IDENTITY_API_URL: url,
-      CARD_API_URL: url,
-      BILLING_API_URL: url,
-      UPSTREAM_TIMEOUT_MS: { type: "integer", default: 1000 },
-      // Mock clients are only created where the environment allows them; production never sets this.
-      UPSTREAM_MOCKS_ALLOWED: { type: "boolean", default: false },
-      IDENTITY_API_MOCK_URL: url,
-      CARD_API_MOCK_URL: url,
-      BILLING_API_MOCK_URL: url,
-      UNLEASH_URL: url,
-      UNLEASH_TOKEN: { type: "string", minLength: 1 },
-      UNLEASH_REFRESH_MS: { type: "integer", default: 15_000 },
-    },
-    if: { properties: { UPSTREAM_MOCKS_ALLOWED: { const: true } } },
-    then: { required: ["IDENTITY_API_MOCK_URL", "CARD_API_MOCK_URL", "BILLING_API_MOCK_URL"] },
-    dependencies: { UNLEASH_URL: ["UNLEASH_TOKEN"] },
+}>({
+  properties: {
+    IDENTITY_API_URL: url,
+    CARD_API_URL: url,
+    BILLING_API_URL: url,
+    UPSTREAM_TIMEOUT_MS: { type: "integer", default: 1000 },
+    // Mock clients are only created where the environment allows them; production never sets this.
+    UPSTREAM_MOCKS_ALLOWED: { type: "boolean", default: false },
+    IDENTITY_API_MOCK_URL: url,
+    CARD_API_MOCK_URL: url,
+    BILLING_API_MOCK_URL: url,
+    UNLEASH_URL: url,
+    UNLEASH_TOKEN: { type: "string", minLength: 1 },
+    UNLEASH_REFRESH_MS: { type: "integer", default: 15_000 },
   },
+  required: ["IDENTITY_API_URL", "CARD_API_URL", "BILLING_API_URL"],
+  if: { properties: { UPSTREAM_MOCKS_ALLOWED: { const: true } } },
+  then: { required: ["IDENTITY_API_MOCK_URL", "CARD_API_MOCK_URL", "BILLING_API_MOCK_URL"] },
+  dependencies: { UNLEASH_URL: ["UNLEASH_TOKEN"] },
 });
 
 const unleash = config.UNLEASH_URL
@@ -55,22 +48,25 @@ const unleash = config.UNLEASH_URL
   : undefined;
 const flags: SourceFlags | null = unleash ? unleashFlags(unleash) : null;
 
-const app = await buildApp({
-  routing: {
-    real: createUpstreams({ identity: config.IDENTITY_API_URL, card: config.CARD_API_URL, billing: config.BILLING_API_URL }),
-    mock: config.UPSTREAM_MOCKS_ALLOWED
-      ? createUpstreams({
-          identity: config.IDENTITY_API_MOCK_URL!,
-          card: config.CARD_API_MOCK_URL!,
-          billing: config.BILLING_API_MOCK_URL!,
-        })
-      : null,
-    flags,
-  },
-  demoUserId: config.DEMO_USER_ID,
-  timeoutMs: config.UPSTREAM_TIMEOUT_MS,
-  ...(config.CONTRACT_PATH ? { contractPath: config.CONTRACT_PATH } : {}),
-  logger: true,
+const routing = {
+  real: createUpstreams({ identity: config.IDENTITY_API_URL, card: config.CARD_API_URL, billing: config.BILLING_API_URL }),
+  mock: config.UPSTREAM_MOCKS_ALLOWED
+    ? createUpstreams({
+        identity: config.IDENTITY_API_MOCK_URL!,
+        card: config.CARD_API_MOCK_URL!,
+        billing: config.BILLING_API_MOCK_URL!,
+      })
+    : null,
+  flags,
+};
+
+// The request pipeline, in order: errors as problem+json, who is asking, then the contract's routes.
+const app = createService();
+await app.register(problemJson);
+await app.register(demoIdentity, { userId: config.DEMO_USER_ID });
+await app.register(contract, {
+  path: config.CONTRACT_PATH ?? contractPath("app-bff"),
+  handlers: bffHandlers({ routing, timeoutMs: config.UPSTREAM_TIMEOUT_MS }),
 });
 app.addHook("onClose", async () => unleash?.destroy());
 

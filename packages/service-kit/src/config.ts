@@ -1,10 +1,22 @@
-/** Settings every service reads from its environment; each service adds its own. */
-export const serviceEnv = {
-  PORT: { type: "integer" },
-  DEMO_USER_ID: { type: "string", minLength: 1 },
-  CONTRACT_PATH: { type: "string" },
-} as const;
-
-export const serviceEnvRequired = ["PORT", "DEMO_USER_ID"] as const;
+import envSchema from "env-schema";
 
 export type ServiceEnv = { PORT: number; DEMO_USER_ID: string; CONTRACT_PATH?: string };
+
+type Schema = { properties?: Record<string, object>; required?: readonly string[]; [keyword: string]: unknown };
+
+/** The environment every service reads, plus the service's own settings, validated at startup. */
+export function loadServiceConfig<Own extends object = object>({ properties = {}, required = [], ...keywords }: Schema = {}) {
+  return envSchema<ServiceEnv & Own>({
+    schema: {
+      type: "object",
+      required: ["PORT", "DEMO_USER_ID", ...required],
+      properties: {
+        PORT: { type: "integer" },
+        DEMO_USER_ID: { type: "string", minLength: 1 },
+        CONTRACT_PATH: { type: "string" },
+        ...properties,
+      },
+      ...keywords,
+    },
+  });
+}

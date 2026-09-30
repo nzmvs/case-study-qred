@@ -1,21 +1,17 @@
-import { createDatabase, type ServiceEnv, serviceEnv, serviceEnvRequired } from "@qred/service-kit";
-import envSchema from "env-schema";
-import { buildApp } from "./app.js";
+import { contract, contractPath, createDatabase, createService, demoIdentity, loadServiceConfig, problemJson } from "@qred/service-kit";
 import type { DB } from "./db/types.js";
+import { identityHandlers } from "./handlers.js";
 
-const config = envSchema<ServiceEnv & { DATABASE_URL: string }>({
-  schema: {
-    type: "object",
-    required: [...serviceEnvRequired, "DATABASE_URL"],
-    properties: { ...serviceEnv, DATABASE_URL: { type: "string" } },
-  },
+const config = loadServiceConfig<{ DATABASE_URL: string }>({
+  properties: { DATABASE_URL: { type: "string" } },
+  required: ["DATABASE_URL"],
 });
+const db = createDatabase<DB>(config.DATABASE_URL);
 
-const app = await buildApp({
-  db: createDatabase<DB>(config.DATABASE_URL),
-  demoUserId: config.DEMO_USER_ID,
-  ...(config.CONTRACT_PATH ? { contractPath: config.CONTRACT_PATH } : {}),
-  logger: true,
-});
+// The request pipeline, in order: errors as problem+json, who is asking, then the contract's routes.
+const app = createService();
+await app.register(problemJson);
+await app.register(demoIdentity, { userId: config.DEMO_USER_ID });
+await app.register(contract, { path: config.CONTRACT_PATH ?? contractPath("identity-api"), handlers: identityHandlers({ db }) });
 
 await app.listen({ host: "0.0.0.0", port: config.PORT });
