@@ -61,4 +61,7 @@ function problemHandler(mapError: ErrorMapper = () => undefined) {
 
 export const problemJson = fp<{ mapError?: ErrorMapper }>(async (app, { mapError }) => {
   app.setErrorHandler(problemHandler(mapError));
+  app.setNotFoundHandler(async (request) => {
+    throw httpErrors.notFound(`No route for ${request.method} ${request.url}.`);
+  });
 });

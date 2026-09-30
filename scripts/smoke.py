@@ -105,6 +105,9 @@ def main() -> int:
     check(400, "spend bad range", request("GET", f"/cards/{ACTIVE_CARD}/spend?from={period_end}&to={period_start}"))
     page = check(200, "transactions page", request("GET", f"/cards/{ACTIVE_CARD}/transactions?limit=3"))
     expect("totalCount 57", page.json().get("totalCount") == 57, page.body)
+    unknown = check(404, "unknown route", request("GET", "/nope"))
+    content_type = unknown.headers.get("content-type", "")
+    expect("unknown route is problem+json", content_type.startswith("application/problem+json"), content_type)
 
     stored = etag(INACTIVE_CARD)
     check(428, "put without If-Match", request("PUT", f"/cards/{INACTIVE_CARD}", body=card_input("active")))
