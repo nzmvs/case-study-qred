@@ -1,6 +1,35 @@
 # Qred Card
 
-Backend for the card overview screen of the Qred mobile app: the selected Company, the User's Card, Remaining spend against the Spending limit, the latest Transactions and the next Invoice due. Built contract-first: every API has an OpenAPI contract, a mock generated from it, and an implementation whose routes and validation come from that same contract.
+## Objectives
+
+1. Derive an improved process and workflow that alleviates the challenges presented in the case.
+2. Create a demo project that shows the strategy in action.
+
+Auxiliary objectives:
+
+1. Test the quality of agentic project scaffolding using improved agent prompting flows.
+
+## Presentation
+
+1. **Slides.** [docs/slides/index.html](docs/slides/index.html), a single self-contained file: open it in a browser, or print it to PDF.
+2. **Structure.** The case's seven scenario statements, grouped into themes, the six principles derived from them, and the target architecture they lead to. Implementation details are in an appendix.
+3. **Controls.** Arrow keys or space to move, `n` for the speaker notes, `f` for fullscreen.
+
+## What's in the package
+
+1. **Contracts.** OpenAPI files for the App BFF and the three domain services in `contracts/`, the source of truth for routes, validation, types and mocks.
+2. **Domain services.** The Identity, Card and Billing APIs, each with its own Postgres database, migrations and demo data.
+3. **App BFF.** One endpoint per Screen, composing the domain services, with a feature flag per upstream to switch between its contract mock and the real service.
+4. **Internal SDK.** `packages/service-kit`: the request pipeline, error format, config and database setup every service is built on.
+5. **Demo harness.** A dev-only page that renders the Screen, flips the flags and simulates purchases as the Card processor.
+6. **Checks.** Unit tests, contract tests with Schemathesis, smoke tests and contract linting.
+7. **Decisions and language.** ADRs in `docs/adr/` and the domain glossary in `CONTEXT.md`.
+
+## Future work
+
+1. **Contract governance in CI.** Enforcing the contracts is what makes this approach work: breaking-change detection on every contract change, an owning team per contract, and consumer tests from the app team.
+2. **More Screens through the same loop.** A new Screen, such as the Transactions view behind "54 more", starts as a contract extension. Code generation then produces the missing types, clients, validation and mocks, so they are not written by hand in each service.
+3. **Production concerns.** Authentication and authorisation, centralised logging and tracing, and resilience such as timeouts and circuit breakers per upstream.
 
 ## Run it
 
@@ -35,7 +64,6 @@ The Card API mock answers every Company with the same example Card and keeps no 
 | How both are optimised for the frontend and the backend | [Schema and payload design](#schema-and-payload-design) below |
 | API structure | the App BFF over three domain services, each with its own contract ([ADR 0001](docs/adr/0001-card-api-and-bff-split.md)) |
 | Code implementation | `apps/` and `packages/service-kit/`, described below |
-| Notes on further work | [NOTES.md](NOTES.md) |
 
 ## Schema and payload design
 
@@ -58,7 +86,7 @@ The Card API mock answers every Company with the same example Card and keeps no 
 | latest Transactions, paged on `(occurred_at, id)` | the same index | index scan, no sort |
 | next Invoice due | `invoices (company_id, due_date)` | index scan |
 
-The plans are from `EXPLAIN` on the seed data with sequential scans disabled, since the demo tables fit in one page; confirming them at volume is in [NOTES.md](NOTES.md). The rest of the schema keeps rules in Postgres and state exact:
+The plans are from `EXPLAIN` on the seed data with sequential scans disabled, since the demo tables fit in one page. The rest of the schema keeps rules in Postgres and state exact:
 
 - Money is `bigint` minor units, statuses are `text` with `CHECK` constraints, and a partial unique index allows one open Card per Cardholder and Company.
 - `expired` and `overdue` are derived on read from `expires_at` and `due_at`, so they are exact without a background job.
@@ -146,7 +174,6 @@ tests/contract/     Schemathesis configuration per service
 scripts/            contract and smoke test runners (Python 3.9+, standard library only)
 docs/adr/           architecture decisions
 CONTEXT.md          domain glossary
-NOTES.md            known simplifications and further work
 turbo.json          workspace tasks: build, typecheck, test, gen
 ```
 
@@ -207,10 +234,3 @@ The App BFF has the same pipeline but no database: `upstreams.ts` holds typed cl
 | `pnpm compose ...` | any other `docker compose` command for this stack |
 
 `test`, `typecheck`, `build` and `gen` run through Turborepo and are cached: a repeat run with no changes finishes in milliseconds. The contract and smoke tests run against the running stack (`pnpm start` first); they change data and reseed afterwards. In the dev stack, starting or restarting a service also reseeds its demo data.
-
-## Further reading
-
-- [CONTEXT.md](CONTEXT.md): the domain language used in code, contracts and docs
-- [NOTES.md](NOTES.md): known simplifications and what I would do with more time
-- [docs/slides/index.html](docs/slides/index.html): the presentation for both tasks; open it in a browser (arrow keys to move, `n` for notes, `f` for fullscreen)
-- [docs/adr](docs/adr): why the services are split, why PUT with If-Match, the fixed demo User, feature-flagged upstreams, UTC spend periods
